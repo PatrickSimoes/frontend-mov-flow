@@ -1,20 +1,15 @@
+import { fileURLToPath, URL } from 'node:url'
+import Vue from '@vitejs/plugin-vue'
+import Fonts from 'unplugin-fonts/vite'
 // Plugins
 import Components from 'unplugin-vue-components/vite'
-import Vue from '@vitejs/plugin-vue'
-import Vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
-import Fonts from 'unplugin-fonts/vite'
-import VueRouter from 'unplugin-vue-router/vite'
-
 // Utilities
 import { defineConfig } from 'vite'
-import { fileURLToPath, URL } from 'node:url'
+import Vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    VueRouter({
-      dts: 'src/typed-router.d.ts',
-    }),
     Vue({
       template: { transformAssetUrls },
     }),
@@ -29,25 +24,22 @@ export default defineConfig({
       dts: 'src/components.d.ts',
     }),
     Fonts({
-      fontsource: {
+      google: {
         families: [
           {
-            name: 'Roboto',
-            weights: [100, 300, 400, 500, 700, 900],
-            styles: ['normal', 'italic'],
+            name: 'Space Grotesk',
+            styles: 'wght@400;500;600;700',
+          },
+          {
+            name: 'JetBrains Mono',
+            styles: 'wght@400;600',
           },
         ],
       },
     }),
   ],
   optimizeDeps: {
-    exclude: [
-      'vuetify',
-      'vue-router',
-      'unplugin-vue-router/runtime',
-      'unplugin-vue-router/data-loaders',
-      'unplugin-vue-router/data-loaders/basic',
-    ],
+    exclude: ['vuetify'],
   },
   define: { 'process.env': {} },
   resolve: {
@@ -57,6 +49,12 @@ export default defineConfig({
     extensions: ['.js', '.json', '.jsx', '.mjs', '.ts', '.tsx', '.vue'],
   },
   server: {
-    port: 3000,
+    port: 3001,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
   },
 })

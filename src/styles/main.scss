@@ -1,0 +1,44 @@
+:root {
+  --app-display-font: 'Space Grotesk', 'Trebuchet MS', sans-serif;
+  --app-text-font: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --app-code-font: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--app-text-font);
+  background: rgb(243 246 239);
+  color: rgb(28 37 39);
+}
+
+.v-application {
+  font-family: var(--app-text-font);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.text-h1,
+.text-h2,
+.text-h3,
+.text-h4,
+.text-h5,
+.text-h6 {
+  font-family: var(--app-display-font) !important;
+  letter-spacing: 0.01em;
+}
+
+code,
+pre,
+.text-mono {
+  font-family: var(--app-code-font) !important;
+}

@@ -1,11 +1,11 @@
 <template>
-  <v-app>
-    <v-main>
-      <router-view />
-    </v-main>
+  <v-app class="app-root">
+    <router-view />
   </v-app>
 </template>
 
-<script lang="ts" setup>
-//
-</script>
+<style scoped>
+.app-root {
+  min-height: 100vh;
+}
+</style>
