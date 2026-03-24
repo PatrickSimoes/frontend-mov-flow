@@ -1,40 +1,38 @@
-/**
- * main.ts
- *
- * Bootstraps Vuetify and other plugins then mounts the App`
- */
-
-// Composables
 import { createApp } from 'vue'
-// Plugins
-import { registerPlugins } from '@/plugins'
+import { createPinia } from 'pinia'
 import router from '@/router'
-import { configureHttpClient } from '@/services/http'
-import { useSessionStore } from '@/stores/session'
-
-// Components
+import vuetify from '@/plugins/vuetify'
+import { configureHttpClient } from '@/core/http/client'
+import { useAuthStore } from '@/stores/auth'
 import App from './App.vue'
-
-// Styles
 import 'unfonts.css'
 import '@/styles/main.scss'
 
 const app = createApp(App)
-const session = useSessionStore()
+const pinia = createPinia()
 
-registerPlugins(app)
+app.use(pinia)
+app.use(router)
+app.use(vuetify)
+
+const auth = useAuthStore(pinia)
 
 configureHttpClient({
-  getAccessToken: () => session.accessToken.value,
+  getAccessToken: () => auth.accessToken,
   onUnauthorized: () => {
-    session.handleUnauthorized()
+    auth.handleUnauthorized()
 
     if (router.currentRoute.value.name !== 'login') {
-      router.push({ name: 'login' })
+      void router.push({
+        name: 'login',
+        query: {
+          reason: 'session-expired',
+        },
+      })
     }
   },
 })
 
-void session.initialize()
+void auth.initialize()
 
 app.mount('#app')

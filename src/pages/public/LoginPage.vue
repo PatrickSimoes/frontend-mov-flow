@@ -1,18 +1,18 @@
 <template>
   <div class="public-screen">
     <v-container class="fill-height d-flex align-center justify-center">
-      <v-card class="pa-6 auth-card" elevation="6" rounded="xl" width="520">
+      <v-card class="pa-6 auth-card" elevation="7" rounded="xl" width="540">
         <div class="text-overline text-secondary mb-2">Mov Flow</div>
-        <h1 class="text-h4 font-weight-bold mb-1">Entrar no portal</h1>
+        <h1 class="text-h4 font-weight-bold mb-1">Entrar no workspace</h1>
         <p class="text-body-2 text-medium-emphasis mb-6">
-          Use <strong>tenantSlug</strong>, e-mail e senha para acessar o ambiente multi-tenant.
+          Acesse com <strong>tenant slug</strong>, e-mail e senha.
         </p>
 
         <v-form @submit.prevent="handleSubmit">
           <v-text-field
             v-model.trim="form.tenantSlug"
             label="Tenant slug"
-            placeholder="empresa-abc"
+            placeholder="acme-logistica"
             prepend-inner-icon="mdi-domain"
             required
             variant="outlined"
@@ -55,8 +55,8 @@
         </v-form>
 
         <div class="text-body-2 text-medium-emphasis mt-4">
-          Ainda não tem tenant?
-          <RouterLink class="auth-link" to="/register">Criar conta inicial</RouterLink>
+          Primeiro acesso?
+          <RouterLink class="auth-link" to="/register">Criar tenant inicial</RouterLink>
         </div>
       </v-card>
     </v-container>
@@ -64,45 +64,45 @@
 </template>
 
 <script setup lang="ts">
-  import { reactive, ref } from 'vue'
-  import { useRoute, useRouter } from 'vue-router'
-  import { ApiError } from '@/services/http'
-  import { useSessionStore } from '@/stores/session'
+import { reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ApiError } from '@/core/types/api'
+import { useAuthStore } from '@/stores/auth'
 
-  const router = useRouter()
-  const route = useRoute()
-  const session = useSessionStore()
+const router = useRouter()
+const route = useRoute()
+const auth = useAuthStore()
 
-  const form = reactive({
-    tenantSlug: '',
-    email: '',
-    password: '',
-  })
+const form = reactive({
+  tenantSlug: '',
+  email: '',
+  password: '',
+})
 
-  const showPassword = ref(false)
-  const submitting = ref(false)
-  const errorMessage = ref<string | null>(null)
+const showPassword = ref(false)
+const submitting = ref(false)
+const errorMessage = ref<string | null>(null)
 
-  async function handleSubmit () {
-    if (!form.tenantSlug || !form.email || !form.password) {
-      errorMessage.value = 'Preencha tenant, e-mail e senha.'
-      return
-    }
-
-    submitting.value = true
-    errorMessage.value = null
-
-    try {
-      await session.login(form)
-      const redirectTarget = typeof route.query.redirect === 'string' ? route.query.redirect : '/app/dashboard'
-      await router.push(redirectTarget)
-    } catch (error) {
-      errorMessage.value
-        = error instanceof ApiError ? error.message : 'Não foi possível autenticar. Tente novamente.'
-    } finally {
-      submitting.value = false
-    }
+async function handleSubmit() {
+  if (!form.tenantSlug || !form.email || !form.password) {
+    errorMessage.value = 'Preencha tenant, e-mail e senha.'
+    return
   }
+
+  submitting.value = true
+  errorMessage.value = null
+
+  try {
+    await auth.login(form)
+    const redirectTarget =
+      typeof route.query.redirect === 'string' ? route.query.redirect : '/app/dashboard'
+    await router.push(redirectTarget)
+  } catch (error) {
+    errorMessage.value = error instanceof ApiError ? error.message : 'Não foi possível autenticar.'
+  } finally {
+    submitting.value = false
+  }
+}
 </script>
 
 <style scoped>

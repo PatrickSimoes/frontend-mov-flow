@@ -1,7 +1,12 @@
 <template>
   <v-container class="fill-height d-flex align-center justify-center">
     <v-card class="pa-6" max-width="560" rounded="xl">
-      <v-chip class="mb-4" color="secondary" prepend-icon="mdi-map-marker-question-outline" variant="tonal">
+      <v-chip
+        class="mb-4"
+        color="secondary"
+        prepend-icon="mdi-map-marker-question-outline"
+        variant="tonal"
+      >
         404
       </v-chip>
 

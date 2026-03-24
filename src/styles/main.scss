@@ -2,6 +2,7 @@
   --app-display-font: 'Space Grotesk', 'Trebuchet MS', sans-serif;
   --app-text-font: 'Space Grotesk', 'Segoe UI', sans-serif;
   --app-code-font: 'JetBrains Mono', 'Courier New', monospace;
+  --app-content-max-width: 1820px;
 }
 
 html,
@@ -13,12 +14,20 @@ body,
 body {
   margin: 0;
   font-family: var(--app-text-font);
-  background: rgb(243 246 239);
+  background: rgb(244 247 242);
   color: rgb(28 37 39);
 }
 
 .v-application {
   font-family: var(--app-text-font);
+}
+
+.v-container {
+  max-width: var(--app-content-max-width);
+}
+
+.text-mono {
+  font-family: var(--app-code-font) !important;
 }
 
 h1,

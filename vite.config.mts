@@ -1,8 +1,6 @@
 import { fileURLToPath, URL } from 'node:url'
 import Vue from '@vitejs/plugin-vue'
 import Fonts from 'unplugin-fonts/vite'
-// Plugins
-import Components from 'unplugin-vue-components/vite'
 // Utilities
 import { defineConfig } from 'vite'
 import Vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
@@ -19,9 +17,6 @@ export default defineConfig({
       styles: {
         configFile: 'src/styles/settings.scss',
       },
-    }),
-    Components({
-      dts: 'src/components.d.ts',
     }),
     Fonts({
       google: {

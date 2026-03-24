@@ -16,7 +16,7 @@
         <v-btn color="primary" prepend-icon="mdi-view-dashboard-outline" to="/app/dashboard">
           Voltar ao dashboard
         </v-btn>
-        <v-btn prepend-icon="mdi-credit-card-outline" to="/app/billing" variant="outlined">
+        <v-btn prepend-icon="mdi-credit-card-outline" to="/app/billing/plans" variant="outlined">
           Ver billing/plano
         </v-btn>
       </div>
@@ -25,26 +25,26 @@
 </template>
 
 <script setup lang="ts">
-  import { computed } from 'vue'
-  import { useRoute } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 
-  const route = useRoute()
+const route = useRoute()
 
-  const reason = computed(() => {
-    const value = route.query.reason
-    return typeof value === 'string' ? value : 'permission'
-  })
+const reason = computed(() => {
+  const value = route.query.reason
+  return typeof value === 'string' ? value : 'permission'
+})
 
-  const resourceLabel = computed(() => {
-    const value = route.query.resource
-    return typeof value === 'string' ? value : 'indefinido'
-  })
+const resourceLabel = computed(() => {
+  const value = route.query.resource
+  return typeof value === 'string' ? value : 'indefinido'
+})
 
-  const reasonLabel = computed(() => {
-    if (reason.value === 'module') {
-      return 'O tenant atual não possui o módulo necessário no plano ativo.'
-    }
+const reasonLabel = computed(() => {
+  if (reason.value === 'module') {
+    return 'O tenant atual não possui o módulo necessário no plano ativo.'
+  }
 
-    return 'O usuário autenticado não possui a permissão necessária para esta rota.'
-  })
+  return 'O usuário autenticado não possui a permissão necessária para esta rota.'
+})
 </script>

@@ -9,15 +9,19 @@
     >
       <div class="pa-6 pb-2">
         <div class="text-overline text-secondary">Mov Flow</div>
-        <h1 class="text-h5 font-weight-bold">Portal SaaS</h1>
-        <div class="text-body-2 text-medium-emphasis">Logística, operação e financeiro multi-tenant</div>
+        <h1 class="text-h5 font-weight-bold">ERP SaaS</h1>
+        <div class="text-body-2 text-medium-emphasis">
+          Operação, financeiro e billing multi-tenant
+        </div>
       </div>
 
       <v-divider class="mb-2" />
 
       <v-list class="px-2" density="comfortable" nav>
-        <template v-for="section in visibleNavigation" :key="section.title">
-          <v-list-subheader class="text-uppercase text-caption">{{ section.title }}</v-list-subheader>
+        <template v-for="section in visibleSections" :key="section.title">
+          <v-list-subheader class="text-uppercase text-caption">{{
+            section.title
+          }}</v-list-subheader>
 
           <v-list-item
             v-for="item in section.items"
@@ -37,21 +41,21 @@
           <div class="text-caption text-medium-emphasis mb-2">Módulos habilitados</div>
           <div class="d-flex flex-wrap ga-2">
             <v-chip
-              v-for="moduleCode in session.state.enabledModules"
+              v-for="moduleCode in auth.enabledModules"
               :key="moduleCode"
               color="primary"
               size="small"
               variant="tonal"
             >
-              {{ MODULE_LABELS[moduleCode] }}
+              {{ moduleCode }}
             </v-chip>
             <v-chip
-              v-if="session.state.enabledModules.length === 0"
+              v-if="auth.enabledModules.length === 0"
               color="warning"
               size="small"
               variant="outlined"
             >
-              Nenhum módulo ativo
+              Não informado
             </v-chip>
           </div>
         </div>
@@ -67,16 +71,25 @@
           @click="drawer = !drawer"
         />
 
-        <v-app-bar-title class="text-h6 font-weight-bold">{{ pageTitle }}</v-app-bar-title>
+        <div class="d-flex flex-column">
+          <v-breadcrumbs class="pa-0" density="compact">
+            <v-breadcrumbs-item
+              v-for="crumb in breadcrumbs"
+              :key="crumb.key"
+              :disabled="crumb.disabled"
+              :to="crumb.to"
+            >
+              {{ crumb.title }}
+            </v-breadcrumbs-item>
+          </v-breadcrumbs>
 
-        <v-chip
-          v-if="session.state.tenant"
-          class="mr-3"
-          color="secondary"
-          size="small"
-          variant="flat"
-        >
-          {{ session.state.tenant.slug }}
+          <div class="text-subtitle-1 font-weight-bold">{{ pageTitle }}</div>
+        </div>
+
+        <v-spacer />
+
+        <v-chip v-if="auth.tenant" class="mr-3" color="secondary" size="small" variant="flat">
+          {{ auth.tenant.slug }}
         </v-chip>
 
         <v-menu location="bottom end">
@@ -84,23 +97,28 @@
             <v-btn v-bind="props" icon="mdi-account-circle-outline" variant="text" />
           </template>
 
-          <v-card min-width="280" rounded="xl">
+          <v-card min-width="300" rounded="xl">
             <v-card-text>
               <div class="text-subtitle-1 font-weight-bold">
-                {{ session.state.session?.user.name || 'Usuário' }}
+                {{ auth.session?.user.name || 'Usuário' }}
               </div>
               <div class="text-body-2 text-medium-emphasis">
-                {{ session.state.session?.user.email || '-' }}
+                {{ auth.session?.user.email || '-' }}
               </div>
               <div class="text-caption mt-2">
-                Roles: {{ session.state.session?.user.roles.join(', ') || 'sem role' }}
+                Roles: {{ auth.session?.user.roles.join(', ') || 'sem role' }}
               </div>
             </v-card-text>
 
             <v-divider />
 
             <v-card-actions>
-              <v-btn color="primary" prepend-icon="mdi-cog-outline" to="/app/settings" variant="text">
+              <v-btn
+                color="primary"
+                prepend-icon="mdi-cog-outline"
+                to="/app/admin/settings"
+                variant="text"
+              >
                 Configurações
               </v-btn>
               <v-spacer />
@@ -117,76 +135,238 @@
       </v-container>
     </v-main>
 
-    <v-snackbar v-model="showSessionWarning" color="warning" timeout="5000">
-      {{ session.state.bootstrapError }}
-    </v-snackbar>
+    <AppSnackbar />
+    <AppConfirmDialog />
   </div>
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch } from 'vue'
-  import { useRoute, useRouter } from 'vue-router'
-  import { useDisplay } from 'vuetify'
-  import { MODULE_LABELS, NAVIGATION, type NavItem } from '@/config/navigation'
-  import { useSessionStore } from '@/stores/session'
+import type { ModuleCode } from '@/core/types/auth'
+import { computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useDisplay } from 'vuetify'
+import { reports, resources } from '@/modules/registry/resources'
+import AppConfirmDialog from '@/shared/components/AppConfirmDialog.vue'
+import AppSnackbar from '@/shared/components/AppSnackbar.vue'
+import { useAppShellStore } from '@/stores/app-shell'
+import { useAuthStore } from '@/stores/auth'
 
-  const display = useDisplay()
-  const route = useRoute()
-  const router = useRouter()
-  const session = useSessionStore()
+type NavItem = {
+  title: string
+  subtitle: string
+  to: string
+  icon: string
+  permissionsAny?: string[]
+  permissionsAll?: string[]
+  modulesAny?: ModuleCode[]
+  modulesAll?: ModuleCode[]
+}
 
-  const drawer = ref(!display.mdAndDown.value)
-  const showSessionWarning = ref(false)
+type NavSection = {
+  title: string
+  items: NavItem[]
+}
 
-  watch(
-    () => display.mdAndDown.value,
-    isMobile => {
-      drawer.value = !isMobile
+const display = useDisplay()
+const route = useRoute()
+const router = useRouter()
+
+const auth = useAuthStore()
+const appShell = useAppShellStore()
+
+const drawer = computed({
+  get: () => appShell.drawerOpen,
+  set: (value) => appShell.setDrawer(value),
+})
+
+watch(
+  () => display.mdAndDown.value,
+  (isMobile) => {
+    appShell.setDrawer(!isMobile)
+  },
+  { immediate: true },
+)
+
+watch(
+  () => auth.bootstrapError,
+  (message) => {
+    if (message) appShell.notify(message, 'warning')
+  },
+)
+
+const staticSections = computed<NavSection[]>(() => {
+  return [
+    {
+      title: 'Visão Geral',
+      items: [
+        {
+          title: 'Dashboard',
+          subtitle: 'Resumo do tenant, sessão e módulos',
+          to: '/app/dashboard',
+          icon: 'mdi-view-dashboard-outline',
+        },
+      ],
     },
-  )
-
-  watch(
-    () => session.state.bootstrapError,
-    message => {
-      showSessionWarning.value = Boolean(message)
+    {
+      title: 'Admin',
+      items: [
+        {
+          title: 'Meu Tenant',
+          subtitle: 'Dados do tenant autenticado',
+          to: '/app/admin/tenant',
+          icon: 'mdi-domain',
+          permissionsAll: ['tenants.read'],
+        },
+        {
+          title: 'Configurações',
+          subtitle: 'Parâmetros globais do tenant',
+          to: '/app/admin/settings',
+          icon: 'mdi-cog-outline',
+          permissionsAll: ['settings.read'],
+        },
+      ],
     },
-  )
+    {
+      title: 'Billing',
+      items: [
+        {
+          title: 'Planos',
+          subtitle: 'Catálogo de planos SaaS',
+          to: '/app/billing/plans',
+          icon: 'mdi-credit-card-outline',
+          permissionsAll: ['saas.plans.read'],
+        },
+        {
+          title: 'Assinatura',
+          subtitle: 'Status da assinatura atual',
+          to: '/app/billing/subscription',
+          icon: 'mdi-file-document-check-outline',
+          permissionsAll: ['saas.subscriptions.read'],
+        },
+        {
+          title: 'Pagamentos',
+          subtitle: 'Histórico de cobranças SaaS',
+          to: '/app/billing/payments',
+          icon: 'mdi-cash-check',
+          permissionsAll: ['saas.payments.read'],
+        },
+        {
+          title: 'Uso',
+          subtitle: 'Métricas e consumo do tenant',
+          to: '/app/billing/usage',
+          icon: 'mdi-chart-bar',
+          permissionsAll: ['saas.usage.read'],
+        },
+        {
+          title: 'Módulos',
+          subtitle: 'Módulos habilitados por assinatura',
+          to: '/app/billing/modules',
+          icon: 'mdi-puzzle-outline',
+          permissionsAll: ['saas.modules.read'],
+        },
+      ],
+    },
+  ]
+})
 
-  const pageTitle = computed(() => {
-    return (route.meta.title as string | undefined) || 'Mov Flow'
-  })
+const resourceSections = computed<NavSection[]>(() => {
+  const adminItems = resources
+    .filter((resource) => resource.section === 'admin')
+    .map<NavItem>((resource) => ({
+      title: resource.title,
+      subtitle: resource.subtitle,
+      to: resource.routePath,
+      icon: resource.icon,
+      permissionsAll: [resource.permissions.read],
+      modulesAll: resource.moduleAccess ? [resource.moduleAccess] : undefined,
+    }))
 
-  function canAccessItem (item: NavItem): boolean {
-    if (item.permissionsAll && !session.hasAllPermissions(item.permissionsAll)) {
-      return false
-    }
+  const operationsItems = resources
+    .filter((resource) => resource.section === 'operations')
+    .map<NavItem>((resource) => ({
+      title: resource.title,
+      subtitle: resource.subtitle,
+      to: resource.routePath,
+      icon: resource.icon,
+      permissionsAll: [resource.permissions.read],
+      modulesAll: resource.moduleAccess ? [resource.moduleAccess] : undefined,
+    }))
 
-    if (item.permissionsAny && !session.hasAnyPermission(item.permissionsAny)) {
-      return false
-    }
+  const financialItems = resources
+    .filter((resource) => resource.section === 'financial')
+    .map<NavItem>((resource) => ({
+      title: resource.title,
+      subtitle: resource.subtitle,
+      to: resource.routePath,
+      icon: resource.icon,
+      permissionsAll: [resource.permissions.read],
+      modulesAll: resource.moduleAccess ? [resource.moduleAccess] : undefined,
+    }))
 
-    if (item.modulesAll && !session.hasAllModules(item.modulesAll)) {
-      return false
-    }
+  const reportItems = reports.map<NavItem>((report) => ({
+    title: report.title,
+    subtitle: 'Relatório financeiro',
+    to: report.routePath,
+    icon: 'mdi-chart-line',
+    permissionsAll: [report.permission],
+    modulesAll: [report.moduleAccess],
+  }))
 
-    if (item.modulesAny && !session.hasAnyModule(item.modulesAny)) {
-      return false
-    }
+  return [
+    { title: 'Cadastros Admin', items: adminItems },
+    { title: 'Operações', items: operationsItems },
+    { title: 'Financeiro', items: financialItems },
+    { title: 'Relatórios', items: reportItems },
+  ]
+})
 
-    return true
-  }
+function canAccessItem(item: NavItem): boolean {
+  if (item.permissionsAll && !auth.hasAllPermissions(item.permissionsAll)) return false
+  if (item.permissionsAny && !auth.hasAnyPermission(item.permissionsAny)) return false
+  if (item.modulesAll && !auth.hasAllModules(item.modulesAll)) return false
+  if (item.modulesAny && !auth.hasAnyModule(item.modulesAny)) return false
+  return true
+}
 
-  const visibleNavigation = computed(() => {
-    return NAVIGATION.map(section => ({
+const visibleSections = computed(() => {
+  return [...staticSections.value, ...resourceSections.value]
+    .map((section) => ({
       ...section,
-      items: section.items.filter(item => canAccessItem(item)),
-    })).filter(section => section.items.length > 0)
-  })
+      items: section.items.filter((item) => canAccessItem(item)),
+    }))
+    .filter((section) => section.items.length > 0)
+})
 
-  function handleLogout () {
-    session.logout()
-    router.push({ name: 'login' })
-  }
+const pageTitle = computed(() => {
+  return (route.meta.title as string | undefined) || 'Mov Flow'
+})
+
+const breadcrumbs = computed(() => {
+  return route.matched
+    .filter((match) => match.meta?.title)
+    .map((match, index, list) => {
+      const title = String(match.meta.title)
+      const disabled = index === list.length - 1
+
+      const target = match.path.replace(/:([a-zA-Z0-9_]+)/g, (_, key: string) => {
+        const value = route.params[key]
+        if (Array.isArray(value)) return value[0] ?? ''
+        return String(value ?? '')
+      })
+
+      return {
+        key: `${match.path}-${index}`,
+        title,
+        disabled,
+        to: disabled ? undefined : target,
+      }
+    })
+})
+
+function handleLogout() {
+  auth.logout()
+  void router.push({ name: 'login' })
+}
 </script>
 
 <style scoped>

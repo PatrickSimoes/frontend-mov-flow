@@ -1,6 +1,12 @@
-import type { ModuleCode } from '@/types/auth'
-import { createRouter, createWebHistory, type RouteLocationNormalized, type RouteRecordRaw } from 'vue-router'
-import { useSessionStore } from '@/stores/session'
+import type { ModuleCode } from '@/core/types/auth'
+import {
+  createRouter,
+  createWebHistory,
+  type RouteLocationNormalized,
+  type RouteRecordRaw,
+} from 'vue-router'
+import { reports, resources } from '@/modules/registry/resources'
+import { useAuthStore } from '@/stores/auth'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -13,6 +19,46 @@ declare module 'vue-router' {
     modulesAll?: ModuleCode[]
   }
 }
+
+function childPathFromAppPath(path: string): string {
+  return path.replace(/^\/app\//, '')
+}
+
+function routeName(prefix: string, rawPath: string): string {
+  const normalized = rawPath.replace(/^\//, '').replace(/\//g, '-').replace(/:/g, '')
+
+  return `${prefix}-${normalized}`
+}
+
+const resourceRoutes: RouteRecordRaw[] = resources.map((resource) => ({
+  path: childPathFromAppPath(resource.routePath),
+  name: routeName('resource', resource.routePath),
+  component: () => import('@/pages/app/ResourceCrudPage.vue'),
+  props: {
+    resourceKey: resource.key,
+  },
+  meta: {
+    title: resource.title,
+    requiresAuth: true,
+    permissionsAll: [resource.permissions.read],
+    modulesAll: resource.moduleAccess ? [resource.moduleAccess] : undefined,
+  },
+}))
+
+const reportRoutes: RouteRecordRaw[] = reports.map((report) => ({
+  path: childPathFromAppPath(report.routePath),
+  name: routeName('report', report.routePath),
+  component: () => import('@/pages/app/ReportViewPage.vue'),
+  props: {
+    reportKey: report.key,
+  },
+  meta: {
+    title: report.title,
+    requiresAuth: true,
+    permissionsAll: [report.permission],
+    modulesAll: [report.moduleAccess],
+  },
+}))
 
 const routes: RouteRecordRaw[] = [
   {
@@ -63,63 +109,89 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/app/DashboardPage.vue'),
         meta: {
           title: 'Dashboard',
+          requiresAuth: true,
         },
       },
       {
-        path: 'admin',
-        name: 'admin',
-        component: () => import('@/pages/app/AdminPage.vue'),
+        path: 'admin/tenant',
+        name: 'admin-tenant',
+        component: () => import('@/pages/app/TenantPage.vue'),
         meta: {
-          title: 'Administrativo',
-          permissionsAny: [
-            'companies.read',
-            'users.read',
-            'roles.read',
-            'permissions.read',
-            'settings.read',
-            'audit.logs.read',
-            'tenants.read',
-          ],
+          title: 'Meu Tenant',
+          requiresAuth: true,
+          permissionsAll: ['tenants.read'],
         },
       },
       {
-        path: 'operations',
-        name: 'operations',
-        component: () => import('@/pages/app/OperationsPage.vue'),
+        path: 'admin/settings',
+        name: 'admin-settings',
+        component: () => import('@/pages/app/SettingsPage.vue'),
         meta: {
-          title: 'Operações',
-          modulesAny: ['fleet', 'logistics'],
-          permissionsAny: ['drivers.read', 'vehicles.read', 'orders.read', 'shipments.read'],
-        },
-      },
-      {
-        path: 'financial',
-        name: 'financial',
-        component: () => import('@/pages/app/FinancialPage.vue'),
-        meta: {
-          title: 'Financeiro',
-          modulesAll: ['financial'],
-          permissionsAny: ['financial.read', 'financial.master.read', 'financial.reports.read'],
-        },
-      },
-      {
-        path: 'billing',
-        name: 'billing',
-        component: () => import('@/pages/app/BillingPage.vue'),
-        meta: {
-          title: 'Billing SaaS',
-          permissionsAny: ['saas.plans.read', 'saas.subscriptions.read', 'saas.payments.read'],
+          title: 'Configurações',
+          requiresAuth: true,
+          permissionsAll: ['settings.read'],
         },
       },
       {
         path: 'settings',
-        name: 'settings',
-        component: () => import('@/pages/app/SettingsPage.vue'),
+        redirect: '/app/admin/settings',
+      },
+      {
+        path: 'billing',
+        redirect: '/app/billing/plans',
+      },
+      {
+        path: 'billing/plans',
+        name: 'billing-plans',
+        component: () => import('@/pages/app/billing/BillingPlansPage.vue'),
         meta: {
-          title: 'Configurações do Tenant',
-          permissionsAll: ['settings.read'],
+          title: 'Planos',
+          requiresAuth: true,
+          permissionsAll: ['saas.plans.read'],
         },
       },
+      {
+        path: 'billing/subscription',
+        name: 'billing-subscription',
+        component: () => import('@/pages/app/billing/BillingSubscriptionPage.vue'),
+        meta: {
+          title: 'Assinatura',
+          requiresAuth: true,
+          permissionsAll: ['saas.subscriptions.read'],
+        },
+      },
+      {
+        path: 'billing/payments',
+        name: 'billing-payments',
+        component: () => import('@/pages/app/billing/BillingPaymentsPage.vue'),
+        meta: {
+          title: 'Pagamentos SaaS',
+          requiresAuth: true,
+          permissionsAll: ['saas.payments.read'],
+        },
+      },
+      {
+        path: 'billing/usage',
+        name: 'billing-usage',
+        component: () => import('@/pages/app/billing/BillingUsagePage.vue'),
+        meta: {
+          title: 'Uso SaaS',
+          requiresAuth: true,
+          permissionsAll: ['saas.usage.read'],
+        },
+      },
+      {
+        path: 'billing/modules',
+        name: 'billing-modules',
+        component: () => import('@/pages/app/billing/BillingModulesPage.vue'),
+        meta: {
+          title: 'Módulos Habilitados',
+          requiresAuth: true,
+          permissionsAll: ['saas.modules.read'],
+        },
+      },
+      ...resourceRoutes,
+      ...reportRoutes,
     ],
   },
   {
@@ -137,53 +209,56 @@ const router = createRouter({
   routes,
 })
 
-function missingPermission (
+function missingPermission(
   route: RouteLocationNormalized,
   hasPermission: (permission: string) => boolean,
 ): string | null {
   const permissionsAll = route.meta.permissionsAll ?? []
   const permissionsAny = route.meta.permissionsAny ?? []
 
-  const missingRequired = permissionsAll.find(permission => !hasPermission(permission))
+  const missingRequired = permissionsAll.find((permission) => !hasPermission(permission))
   if (missingRequired) {
     return missingRequired
   }
 
-  if (permissionsAny.length > 0 && !permissionsAny.some(permission => hasPermission(permission))) {
+  if (
+    permissionsAny.length > 0 &&
+    !permissionsAny.some((permission) => hasPermission(permission))
+  ) {
     return permissionsAny[0] ?? null
   }
 
   return null
 }
 
-function missingModule (
+function missingModule(
   route: RouteLocationNormalized,
   hasModule: (moduleCode: ModuleCode) => boolean,
 ): ModuleCode | null {
   const modulesAll = route.meta.modulesAll ?? []
   const modulesAny = route.meta.modulesAny ?? []
 
-  const missingRequired = modulesAll.find(moduleCode => !hasModule(moduleCode))
+  const missingRequired = modulesAll.find((moduleCode) => !hasModule(moduleCode))
   if (missingRequired) {
     return missingRequired
   }
 
-  if (modulesAny.length > 0 && !modulesAny.some(moduleCode => hasModule(moduleCode))) {
+  if (modulesAny.length > 0 && !modulesAny.some((moduleCode) => hasModule(moduleCode))) {
     return modulesAny[0] ?? null
   }
 
   return null
 }
 
-router.beforeEach(async to => {
-  const session = useSessionStore()
-  await session.initialize()
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
+  await auth.initialize()
 
-  if (to.meta.guestOnly && session.isAuthenticated.value) {
+  if (to.meta.guestOnly && auth.isAuthenticated) {
     return { path: '/app/dashboard' }
   }
 
-  if (to.meta.requiresAuth && !session.isAuthenticated.value) {
+  if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return {
       name: 'login',
       query: {
@@ -196,7 +271,7 @@ router.beforeEach(async to => {
     return true
   }
 
-  const unauthorizedPermission = missingPermission(to, session.hasPermission)
+  const unauthorizedPermission = missingPermission(to, auth.hasPermission)
   if (unauthorizedPermission) {
     return {
       name: 'forbidden',
@@ -207,7 +282,7 @@ router.beforeEach(async to => {
     }
   }
 
-  const unauthorizedModule = missingModule(to, session.hasModule)
+  const unauthorizedModule = missingModule(to, auth.hasModule)
   if (unauthorizedModule) {
     return {
       name: 'forbidden',
@@ -221,7 +296,7 @@ router.beforeEach(async to => {
   return true
 })
 
-router.afterEach(to => {
+router.afterEach((to) => {
   const suffix = 'Mov Flow'
   document.title = to.meta.title ? `${to.meta.title} | ${suffix}` : suffix
 })

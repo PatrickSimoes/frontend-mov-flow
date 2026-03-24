@@ -1,12 +1,23 @@
 <template>
+  <AppPageHeader
+    subtitle="Configurações globais financeiras e operacionais do tenant"
+    title="Configurações"
+  >
+    <template #actions>
+      <v-btn
+        :disabled="loading"
+        prepend-icon="mdi-refresh"
+        variant="outlined"
+        @click="loadSettings"
+      >
+        Recarregar
+      </v-btn>
+    </template>
+  </AppPageHeader>
+
   <v-row>
     <v-col cols="12" lg="8">
-      <v-card class="mb-6" rounded="xl">
-        <v-card-item
-          subtitle="GET/PATCH /settings"
-          title="Configurações do Tenant"
-        />
-
+      <v-card rounded="xl" variant="flat">
         <v-card-text>
           <v-alert v-if="errorMessage" class="mb-4" type="error" variant="tonal">
             {{ errorMessage }}
@@ -18,9 +29,8 @@
                 <v-text-field
                   v-model.trim="form.currency"
                   :disabled="loading"
-                  label="Moeda (ISO 4217)"
+                  label="Moeda"
                   maxlength="3"
-                  placeholder="BRL"
                   required
                   variant="outlined"
                 />
@@ -31,7 +41,6 @@
                   v-model.trim="form.timezone"
                   :disabled="loading"
                   label="Timezone"
-                  placeholder="America/Sao_Paulo"
                   required
                   variant="outlined"
                 />
@@ -42,7 +51,6 @@
                   v-model.number="form.defaultInterestRate"
                   :disabled="loading"
                   label="Juros padrão (%)"
-                  max="999.9999"
                   min="0"
                   required
                   step="0.0001"
@@ -56,7 +64,6 @@
                   v-model.number="form.defaultFineRate"
                   :disabled="loading"
                   label="Multa padrão (%)"
-                  max="999.9999"
                   min="0"
                   required
                   step="0.0001"
@@ -70,7 +77,6 @@
                   v-model.number="form.defaultPaymentTermDays"
                   :disabled="loading"
                   label="Prazo padrão (dias)"
-                  max="365"
                   min="0"
                   required
                   step="1"
@@ -100,12 +106,14 @@
               </v-col>
             </v-row>
 
-            <div class="d-flex ga-3 mt-2">
-              <v-btn color="primary" :loading="saving" prepend-icon="mdi-content-save-outline" type="submit">
-                Salvar configurações
-              </v-btn>
-              <v-btn :disabled="loading" prepend-icon="mdi-refresh" variant="outlined" @click="loadSettings">
-                Recarregar
+            <div class="d-flex justify-end ga-2 mt-2">
+              <v-btn
+                color="primary"
+                :loading="saving"
+                prepend-icon="mdi-content-save-outline"
+                type="submit"
+              >
+                Salvar
               </v-btn>
             </div>
           </v-form>
@@ -114,29 +122,28 @@
     </v-col>
 
     <v-col cols="12" lg="4">
-      <v-card rounded="xl">
-        <v-card-item subtitle="GET /settings/audit" title="Auditoria de Configurações" />
+      <v-card rounded="xl" variant="flat">
+        <v-card-item subtitle="GET /settings/audit" title="Auditoria" />
         <v-card-text>
-          <v-alert
-            v-if="!canReadAudit"
-            class="mb-4"
-            type="info"
-            variant="tonal"
-          >
-            Sem permissão <code>settings.audit.read</code> para consultar histórico.
+          <v-alert v-if="!canReadAudit" type="info" variant="tonal">
+            Sem permissão <code>settings.audit.read</code>.
           </v-alert>
 
-          <v-list v-else class="pa-0 bg-transparent" density="compact" lines="two">
-            <v-list-item v-for="entry in auditEntries.slice(0, 8)" :key="entry.id" prepend-icon="mdi-history">
+          <v-list v-else-if="auditEntries.length > 0" density="compact">
+            <v-list-item
+              v-for="entry in auditEntries.slice(0, 10)"
+              :key="entry.id"
+              prepend-icon="mdi-history"
+            >
               <v-list-item-title>{{ formatDateTime(entry.createdAt) }}</v-list-item-title>
-              <v-list-item-subtitle>
-                changedBy: {{ entry.changedBy || 'sistema' }}
-              </v-list-item-subtitle>
+              <v-list-item-subtitle
+                >changedBy: {{ entry.changedBy || 'sistema' }}</v-list-item-subtitle
+              >
             </v-list-item>
           </v-list>
 
-          <v-alert v-if="canReadAudit && auditEntries.length === 0" type="info" variant="tonal">
-            Nenhuma alteração auditada encontrada.
+          <v-alert v-else-if="canReadAudit" type="info" variant="tonal">
+            Nenhum histórico disponível.
           </v-alert>
         </v-card-text>
       </v-card>
@@ -145,97 +152,111 @@
 </template>
 
 <script setup lang="ts">
-  import type { TenantSettings, TenantSettingsAuditEntry, TenantSettingsUpdatePayload } from '@/types/settings'
-  import { computed, reactive, ref } from 'vue'
-  import { settingsApi } from '@/services/api'
-  import { ApiError } from '@/services/http'
-  import { useSessionStore } from '@/stores/session'
+import { computed, reactive, ref } from 'vue'
+import { apiClient } from '@/core/http/client'
+import { formatDateTime } from '@/core/utils/formatters'
+import AppPageHeader from '@/shared/components/AppPageHeader.vue'
+import { useAppShellStore } from '@/stores/app-shell'
+import { useAuthStore } from '@/stores/auth'
 
-  const session = useSessionStore()
+interface TenantSettings {
+  id: string
+  tenantId: string
+  currency: string
+  timezone: string
+  defaultInterestRate: number
+  defaultFineRate: number
+  defaultPaymentTermDays: number
+  autoGenerateReceivableOnDelivery: boolean
+  allowNegativeCashFlow: boolean
+  createdAt: string
+  updatedAt: string
+  version: number
+}
 
-  const loading = ref(false)
-  const saving = ref(false)
-  const errorMessage = ref<string | null>(null)
+interface TenantSettingsAuditEntry {
+  id: string
+  changedBy?: string
+  createdAt: string
+}
 
-  const currentSettings = ref<TenantSettings | null>(null)
-  const auditEntries = ref<TenantSettingsAuditEntry[]>([])
+const auth = useAuthStore()
+const appShell = useAppShellStore()
 
-  const form = reactive<TenantSettingsUpdatePayload>({
-    currency: 'BRL',
-    timezone: 'America/Sao_Paulo',
-    defaultInterestRate: 0,
-    defaultFineRate: 0,
-    defaultPaymentTermDays: 0,
-    autoGenerateReceivableOnDelivery: true,
-    allowNegativeCashFlow: false,
-  })
+const loading = ref(false)
+const saving = ref(false)
+const errorMessage = ref<string | null>(null)
+const auditEntries = ref<TenantSettingsAuditEntry[]>([])
 
-  const canReadAudit = computed(() => session.hasPermission('settings.audit.read'))
+const form = reactive({
+  currency: 'BRL',
+  timezone: 'America/Sao_Paulo',
+  defaultInterestRate: 0,
+  defaultFineRate: 0,
+  defaultPaymentTermDays: 0,
+  autoGenerateReceivableOnDelivery: true,
+  allowNegativeCashFlow: false,
+})
 
-  function applySettings (settings: TenantSettings) {
-    currentSettings.value = settings
-    form.currency = settings.currency
-    form.timezone = settings.timezone
-    form.defaultInterestRate = Number(settings.defaultInterestRate)
-    form.defaultFineRate = Number(settings.defaultFineRate)
-    form.defaultPaymentTermDays = Number(settings.defaultPaymentTermDays)
-    form.autoGenerateReceivableOnDelivery = settings.autoGenerateReceivableOnDelivery
-    form.allowNegativeCashFlow = settings.allowNegativeCashFlow
-  }
+const canReadAudit = computed(() => auth.hasPermission('settings.audit.read'))
 
-  async function loadSettings () {
-    loading.value = true
-    errorMessage.value = null
+function applySettings(settings: TenantSettings) {
+  form.currency = settings.currency
+  form.timezone = settings.timezone
+  form.defaultInterestRate = Number(settings.defaultInterestRate)
+  form.defaultFineRate = Number(settings.defaultFineRate)
+  form.defaultPaymentTermDays = Number(settings.defaultPaymentTermDays)
+  form.autoGenerateReceivableOnDelivery = settings.autoGenerateReceivableOnDelivery
+  form.allowNegativeCashFlow = settings.allowNegativeCashFlow
+}
 
-    try {
-      const settings = await settingsApi.getSettings()
-      applySettings(settings)
+async function loadSettings() {
+  loading.value = true
+  errorMessage.value = null
 
-      if (canReadAudit.value) {
-        auditEntries.value = await settingsApi.listAudit()
-      }
-    } catch (error) {
-      errorMessage.value
-        = error instanceof ApiError ? error.message : 'Falha ao carregar configurações do tenant.'
-    } finally {
-      loading.value = false
+  try {
+    const settings = await apiClient.get<TenantSettings>('/settings')
+    applySettings(settings)
+
+    if (canReadAudit.value) {
+      auditEntries.value = await apiClient.get<TenantSettingsAuditEntry[]>('/settings/audit')
     }
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Falha ao carregar configurações.'
+  } finally {
+    loading.value = false
   }
+}
 
-  async function saveSettings () {
-    saving.value = true
-    errorMessage.value = null
+async function saveSettings() {
+  saving.value = true
+  errorMessage.value = null
 
-    try {
-      const payload: TenantSettingsUpdatePayload = {
-        currency: form.currency?.toUpperCase(),
-        timezone: form.timezone,
-        defaultInterestRate: Number(form.defaultInterestRate),
-        defaultFineRate: Number(form.defaultFineRate),
-        defaultPaymentTermDays: Number(form.defaultPaymentTermDays),
-        autoGenerateReceivableOnDelivery: Boolean(form.autoGenerateReceivableOnDelivery),
-        allowNegativeCashFlow: Boolean(form.allowNegativeCashFlow),
-      }
-
-      const saved = await settingsApi.updateSettings(payload)
-      applySettings(saved)
-
-      if (canReadAudit.value) {
-        auditEntries.value = await settingsApi.listAudit()
-      }
-    } catch (error) {
-      errorMessage.value
-        = error instanceof ApiError ? error.message : 'Falha ao salvar configurações.'
-    } finally {
-      saving.value = false
+  try {
+    const payload = {
+      currency: form.currency.toUpperCase(),
+      timezone: form.timezone,
+      defaultInterestRate: Number(form.defaultInterestRate),
+      defaultFineRate: Number(form.defaultFineRate),
+      defaultPaymentTermDays: Number(form.defaultPaymentTermDays),
+      autoGenerateReceivableOnDelivery: Boolean(form.autoGenerateReceivableOnDelivery),
+      allowNegativeCashFlow: Boolean(form.allowNegativeCashFlow),
     }
-  }
 
-  function formatDateTime (value: string): string {
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return value
-    return `${date.toLocaleDateString('pt-BR')} ${date.toLocaleTimeString('pt-BR')}`
-  }
+    const saved = await apiClient.patch<TenantSettings>('/settings', payload)
+    applySettings(saved)
+    appShell.notify('Configurações salvas com sucesso.', 'success')
 
-  void loadSettings()
+    if (canReadAudit.value) {
+      auditEntries.value = await apiClient.get<TenantSettingsAuditEntry[]>('/settings/audit')
+    }
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Falha ao salvar configurações.'
+    appShell.notify(errorMessage.value, 'error')
+  } finally {
+    saving.value = false
+  }
+}
+
+void loadSettings()
 </script>

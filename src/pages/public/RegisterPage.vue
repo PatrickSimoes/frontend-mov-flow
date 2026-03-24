@@ -1,17 +1,17 @@
 <template>
   <div class="public-screen">
     <v-container class="fill-height d-flex align-center justify-center">
-      <v-card class="pa-6 auth-card" elevation="6" rounded="xl" width="560">
-        <div class="text-overline text-secondary mb-2">Onboarding</div>
-        <h1 class="text-h4 font-weight-bold mb-1">Criar tenant inicial</h1>
+      <v-card class="pa-6 auth-card" elevation="7" rounded="xl" width="560">
+        <div class="text-overline text-secondary mb-2">Mov Flow Onboarding</div>
+        <h1 class="text-h4 font-weight-bold mb-1">Criar tenant</h1>
         <p class="text-body-2 text-medium-emphasis mb-6">
-          Este cadastro cria o tenant e provisiona o usuário owner com permissões administrativas.
+          O cadastro cria o tenant e um usuário owner para iniciar a operação.
         </p>
 
         <v-form @submit.prevent="handleSubmit">
           <v-text-field
             v-model.trim="form.tenantName"
-            label="Nome da empresa"
+            label="Nome do tenant"
             prepend-inner-icon="mdi-office-building-outline"
             required
             variant="outlined"
@@ -37,9 +37,7 @@
           <v-text-field
             v-model="form.password"
             :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
-            hint="Mínimo de 8 caracteres"
             label="Senha"
-            persistent-hint
             prepend-inner-icon="mdi-lock-outline"
             required
             :type="showPassword ? 'text' : 'password'"
@@ -68,12 +66,12 @@
             size="large"
             type="submit"
           >
-            Criar tenant e entrar
+            Criar tenant
           </v-btn>
         </v-form>
 
         <div class="text-body-2 text-medium-emphasis mt-4">
-          Já possui acesso?
+          Já tem acesso?
           <RouterLink class="auth-link" to="/login">Entrar</RouterLink>
         </div>
       </v-card>
@@ -82,55 +80,55 @@
 </template>
 
 <script setup lang="ts">
-  import { reactive, ref } from 'vue'
-  import { useRouter } from 'vue-router'
-  import { ApiError } from '@/services/http'
-  import { useSessionStore } from '@/stores/session'
+import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ApiError } from '@/core/types/api'
+import { useAuthStore } from '@/stores/auth'
 
-  const router = useRouter()
-  const session = useSessionStore()
+const router = useRouter()
+const auth = useAuthStore()
 
-  const form = reactive({
-    tenantName: '',
-    name: '',
-    email: '',
-    password: '',
-  })
+const form = reactive({
+  tenantName: '',
+  name: '',
+  email: '',
+  password: '',
+})
 
-  const confirmPassword = ref('')
-  const showPassword = ref(false)
-  const submitting = ref(false)
-  const errorMessage = ref<string | null>(null)
+const confirmPassword = ref('')
+const showPassword = ref(false)
+const submitting = ref(false)
+const errorMessage = ref<string | null>(null)
 
-  async function handleSubmit () {
-    if (!form.tenantName || !form.name || !form.email || !form.password) {
-      errorMessage.value = 'Preencha todos os campos obrigatórios.'
-      return
-    }
-
-    if (form.password.length < 8) {
-      errorMessage.value = 'A senha precisa ter pelo menos 8 caracteres.'
-      return
-    }
-
-    if (form.password !== confirmPassword.value) {
-      errorMessage.value = 'As senhas não conferem.'
-      return
-    }
-
-    submitting.value = true
-    errorMessage.value = null
-
-    try {
-      await session.register(form)
-      await router.push('/app/dashboard')
-    } catch (error) {
-      errorMessage.value
-        = error instanceof ApiError ? error.message : 'Não foi possível concluir o cadastro.'
-    } finally {
-      submitting.value = false
-    }
+async function handleSubmit() {
+  if (!form.tenantName || !form.name || !form.email || !form.password) {
+    errorMessage.value = 'Preencha todos os campos obrigatórios.'
+    return
   }
+
+  if (form.password.length < 8) {
+    errorMessage.value = 'A senha precisa ter pelo menos 8 caracteres.'
+    return
+  }
+
+  if (form.password !== confirmPassword.value) {
+    errorMessage.value = 'As senhas não conferem.'
+    return
+  }
+
+  submitting.value = true
+  errorMessage.value = null
+
+  try {
+    await auth.register(form)
+    await router.push('/app/dashboard')
+  } catch (error) {
+    errorMessage.value =
+      error instanceof ApiError ? error.message : 'Não foi possível concluir o cadastro.'
+  } finally {
+    submitting.value = false
+  }
+}
 </script>
 
 <style scoped>
