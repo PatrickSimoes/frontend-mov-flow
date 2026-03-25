@@ -1,82 +1,157 @@
-# Vuetify (Default)
+# Frontend MOV FLOW
 
-This is the official scaffolding tool for Vuetify, designed to give you a head start in building your new Vuetify application. It sets up a base template with all the necessary configurations and standard directory structure, enabling you to begin development without the hassle of setting up the project from scratch.
+Frontend web do ecossistema MOV FLOW.
 
-## ❗️ Important Links
+Aplicacao SaaS multi-tenant focada em operacao logistica, financeiro e billing, com controle de acesso por permissao (RBAC) e bloqueio por modulos habilitados no plano.
 
-- 📄 [Docs](https://vuetifyjs.com/)
-- 🚨 [Issues](https://issues.vuetifyjs.com/)
-- 🏬 [Store](https://store.vuetifyjs.com/)
-- 🎮 [Playground](https://play.vuetifyjs.com/)
-- 💬 [Discord](https://community.vuetifyjs.com)
+## Stack
 
-## 💿 Install
+- Vue 3 + TypeScript
+- Vuetify 3
+- Vue Router 4
+- Vite 7
+- ESLint (`eslint-config-vuetify`)
+- Prettier
 
-Set up your project using your preferred package manager. Use the corresponding command to install the dependencies:
+## Escopo funcional atual
 
-| Package Manager                                           | Command        |
-| --------------------------------------------------------- | -------------- |
-| [yarn](https://yarnpkg.com/getting-started)               | `yarn install` |
-| [npm](https://docs.npmjs.com/cli/v7/commands/npm-install) | `npm install`  |
-| [pnpm](https://pnpm.io/installation)                      | `pnpm install` |
-| [bun](https://bun.sh/#getting-started)                    | `bun install`  |
+- Fluxo publico:
+  - login (`/login`)
+  - registro inicial de tenant (`/register`)
+- Area autenticada (`/app/*`):
+  - dashboard de sessao/tenant/modulos
+  - administrativo (usuarios, roles, permissoes, settings, auditoria)
+  - operacoes (frota e logistica)
+  - financeiro
+  - billing SaaS (planos, assinatura, pagamentos, uso)
+- Protecao por:
+  - `requiresAuth` em rota
+  - `permissionsAll` e `permissionsAny`
+  - `modulesAll` e `modulesAny`
 
-After completing the installation, your environment is ready for Vuetify development.
+## Como rodar localmente
 
-## ✨ Features
+Pre-requisitos:
 
-- 🖼️ **Optimized Front-End Stack**: Leverage the latest Vue 3 and Vuetify 3 for a modern, reactive UI development experience. [Vue 3](https://v3.vuejs.org/) | [Vuetify 3](https://vuetifyjs.com/en/)
-- 🗃️ **State Management**: Integrated with [Pinia](https://pinia.vuejs.org/), the intuitive, modular state management solution for Vue.
-- 🚦 **Routing and Layouts**: Utilizes Vue Router for SPA navigation and vite-plugin-vue-layouts-next for organizing Vue file layouts. [Vue Router](https://router.vuejs.org/) | [vite-plugin-vue-layouts-next](https://github.com/loicduong/vite-plugin-vue-layouts-next)
-- 💻 **Enhanced Development Experience**: Benefit from TypeScript's static type checking and the ESLint plugin suite for Vue, ensuring code quality and consistency. [TypeScript](https://www.typescriptlang.org/) | [ESLint Plugin Vue](https://eslint.vuejs.org/)
-- ⚡ **Next-Gen Tooling**: Powered by Vite, experience fast cold starts and instant HMR (Hot Module Replacement). [Vite](https://vitejs.dev/)
-- 🧩 **Automated Component Importing**: Streamline your workflow with unplugin-vue-components, automatically importing components as you use them. [unplugin-vue-components](https://github.com/antfu/unplugin-vue-components)
-- 🛠️ **Strongly-Typed Vue**: Use vue-tsc for type-checking your Vue components, and enjoy a robust development experience. [vue-tsc](https://github.com/johnsoncodehk/volar/tree/master/packages/vue-tsc)
+- Node.js 22+
+- npm 10+
+- API MOV FLOW rodando
 
-These features are curated to provide a seamless development experience from setup to deployment, ensuring that your Vuetify application is both powerful and maintainable.
-
-## 💡 Usage
-
-This section covers how to start the development server and build your project for production.
-
-### Starting the Development Server
-
-To start the development server with hot-reload, run the following command. The server will be accessible at [http://localhost:3000](http://localhost:3000):
+Instalacao e execucao:
 
 ```bash
-yarn dev
+npm install
+npm run dev
 ```
 
-(Repeat for npm, pnpm, and bun with respective commands.)
-
-> Add NODE_OPTIONS='--no-warnings' to suppress the JSON import warnings that happen as part of the Vuetify import mapping. If you are on Node [v21.3.0](https://nodejs.org/en/blog/release/v21.3.0) or higher, you can change this to NODE_OPTIONS='--disable-warning=5401'. If you don't mind the warning, you can remove this from your package.json dev script.
-
-### Building for Production
-
-To build your project for production, use:
+Build e preview:
 
 ```bash
-yarn build
+npm run build
+npm run preview
 ```
 
-(Repeat for npm, pnpm, and bun with respective commands.)
+## Variaveis de ambiente
 
-Once the build process is completed, your application will be ready for deployment in a production environment.
+- `VITE_API_BASE_URL`: base da API.
+  - default: `/api/v1`
+  - exemplo: `http://localhost:3000/api/v1`
 
-## 💪 Support Vuetify Development
+## Arquitetura de pastas
 
-This project is built with [Vuetify](https://vuetifyjs.com/en/), a UI Library with a comprehensive collection of Vue components. Vuetify is an MIT licensed Open Source project that has been made possible due to the generous contributions by our [sponsors and backers](https://vuetifyjs.com/introduction/sponsors-and-backers/). If you are interested in supporting this project, please consider:
+```text
+src/
+|-- assets/          # arquivos estaticos
+|-- components/      # componentes reutilizaveis
+|-- config/          # configuracoes do app (ex.: navegacao)
+|-- layouts/         # estrutura de paginas autenticadas/publicas
+|-- pages/           # telas por rota
+|-- plugins/         # bootstrap de plugins (vuetify etc.)
+|-- router/          # definicao de rotas e guards
+|-- services/        # cliente HTTP e APIs por dominio
+|-- stores/          # estado global (sessao)
+|-- styles/          # temas e estilos globais
+`-- types/           # contratos de dados
+```
 
-- [Requesting Enterprise Support](https://support.vuetifyjs.com/)
-- [Sponsoring John on Github](https://github.com/users/johnleider/sponsorship)
-- [Sponsoring Kael on Github](https://github.com/users/kaelwd/sponsorship)
-- [Supporting the team on Open Collective](https://opencollective.com/vuetify)
-- [Becoming a sponsor on Patreon](https://www.patreon.com/vuetify)
-- [Becoming a subscriber on Tidelift](https://tidelift.com/subscription/npm/vuetify)
-- [Making a one-time donation with Paypal](https://paypal.me/vuetify)
+## Padrao de componentes
 
-## 📑 License
+Para manter UI/UX consistente e codigo escalavel:
 
-[MIT](http://opensource.org/licenses/MIT)
+- `pages/` orquestram casos de uso da tela e chamadas de API.
+- `components/` concentram blocos reutilizaveis e apresentacionais.
+- `services/api/*` encapsulam acesso HTTP por dominio.
+- `types/*` definem contratos tipados para payloads e responses.
+- Evite logica de negocio em template; concentre em `script setup`.
 
-Copyright (c) 2016-present Vuetify, LLC
+## Diretrizes de UI/UX
+
+- Navegacao deve refletir acesso real do usuario:
+  - esconder itens sem permissao/modulo
+  - bloquear rota com redirecionamento para `/forbidden` quando necessario
+- Cada pagina deve ter:
+  - titulo claro e contexto do dominio
+  - estados de carregamento, vazio e erro
+  - feedback de acao (sucesso/falha) sem ambiguidade
+- Formularios:
+  - labels objetivas
+  - validacao antes de envio
+  - botoes com estado `loading` durante requisicao
+- Consistencia visual:
+  - usar tokens/tema do Vuetify e estilos globais
+  - evitar estilos inline repetidos
+  - manter linguagem visual uniforme entre modulos
+- Acessibilidade minima:
+  - contraste legivel
+  - foco visivel em elementos interativos
+  - texto acionavel claro em botoes e links
+
+## Qualidade de codigo
+
+### Prettier
+
+Padrao atual (`.prettierrc.json`):
+
+- `semi: false`
+- `singleQuote: true`
+- `trailingComma: all`
+- `printWidth: 100`
+- `tabWidth: 2`
+
+Comandos:
+
+```bash
+npm run format
+npm run format:check
+```
+
+### ESLint e tipos
+
+```bash
+npm run lint
+npm run type-check
+```
+
+### Validacao recomendada antes de PR
+
+```bash
+npm run format:check
+npm run lint
+npm run type-check
+npm run build
+```
+
+## Convencoes de implementacao
+
+- Nome de componentes em `PascalCase`.
+- Composables/servicos com funcoes pequenas e foco unico.
+- Evite duplicacao de chamadas HTTP; centralize em `services/api`.
+- Trate erros de API com mensagem amigavel para o usuario.
+- Nao exponha informacao sensivel em tela ou log.
+- Nao criar dependencia nova sem justificativa tecnica clara.
+
+## Relacao com o backend
+
+- O frontend consome endpoints versionados da API (`/api/v1`).
+- Permissoes e modulos habilitados devem ser respeitados na UI e na navegacao.
+- Mudancas de contrato devem ser feitas com sincronizacao entre `types/` e `services/api/`.
