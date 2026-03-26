@@ -1,129 +1,255 @@
 <template>
-  <v-row class="mb-4">
-    <v-col cols="12" md="6" xl="3">
-      <v-card class="h-100" rounded="xl">
-        <v-card-item subtitle="Dados vindos de login/auth me" title="Usuário autenticado" />
-        <v-card-text>
-          <div class="text-h6 font-weight-bold">{{ session.state.session?.user.name || '-' }}</div>
-          <div class="text-body-2 text-medium-emphasis">{{ session.state.session?.user.email || '-' }}</div>
-        </v-card-text>
+  <PageHeader
+    eyebrow="Visao geral"
+    subtitle="Acompanhe o que precisa de atencao agora e avance nas prioridades do dia."
+    title="Painel"
+  >
+    <template #actions>
+      <v-btn color="primary" prepend-icon="mdi-refresh" variant="tonal">Atualizar dados</v-btn>
+      <v-btn
+        prepend-icon="mdi-open-in-new"
+        to="/app/operations"
+        variant="outlined"
+      >Abrir operacao</v-btn>
+    </template>
+  </PageHeader>
+
+  <v-row class="mb-2">
+    <v-col
+      v-for="metric in metrics"
+      :key="metric.label"
+      cols="12"
+      lg="3"
+      sm="6"
+    >
+      <MetricCard
+        :description="metric.description"
+        :icon="metric.icon"
+        :icon-color="metric.iconColor"
+        :label="metric.label"
+        :value="metric.value"
+      />
+    </v-col>
+  </v-row>
+
+  <v-row>
+    <v-col cols="12" xl="8">
+      <v-card class="surface-card mb-4" variant="flat">
+        <v-card-item subtitle="Itens que impactam prazo e faturamento" title="Prioridades do dia" />
+
+        <v-table class="table-wrapper" density="comfortable">
+          <thead>
+            <tr>
+              <th>Tarefa</th>
+              <th>Area</th>
+              <th>Responsavel</th>
+              <th>Prazo</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in priorities" :key="item.id">
+              <td class="font-weight-medium">{{ item.task }}</td>
+              <td>{{ item.area }}</td>
+              <td>{{ item.owner }}</td>
+              <td>{{ item.deadline }}</td>
+              <td>
+                <StatusChip :status="item.status" />
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+      </v-card>
+
+      <v-card class="surface-card" variant="flat">
+        <v-card-item subtitle="Ultimos 7 dias" title="Desempenho recente" />
+
+        <v-table class="table-wrapper" density="comfortable">
+          <thead>
+            <tr>
+              <th>Periodo</th>
+              <th>Pedidos</th>
+              <th>Entregas no prazo</th>
+              <th>Faturamento</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in performanceRows" :key="row.period">
+              <td>{{ row.period }}</td>
+              <td>{{ row.orders }}</td>
+              <td>{{ row.onTimeDelivery }}%</td>
+              <td>{{ formatCurrency(row.revenue) }}</td>
+              <td>
+                <StatusChip :status="row.status" />
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
       </v-card>
     </v-col>
 
-    <v-col cols="12" md="6" xl="3">
-      <v-card class="h-100" rounded="xl">
-        <v-card-item subtitle="Contexto multi-tenant" title="Tenant" />
-        <v-card-text>
-          <div class="text-h6 font-weight-bold">{{ session.state.tenant?.name || 'N/D' }}</div>
-          <div class="text-body-2 text-medium-emphasis">slug: {{ session.state.tenant?.slug || '-' }}</div>
-        </v-card-text>
-      </v-card>
-    </v-col>
+    <v-col cols="12" xl="4">
+      <v-card class="surface-card mb-4" variant="flat">
+        <v-card-item subtitle="Acoes recomendadas" title="Proximos passos" />
 
-    <v-col cols="12" md="6" xl="3">
-      <v-card class="h-100" rounded="xl">
-        <v-card-item subtitle="RBAC para menus e ações" title="Permissões" />
-        <v-card-text>
-          <div class="text-h4 font-weight-bold">{{ session.state.session?.user.permissions.length || 0 }}</div>
-          <div class="text-body-2 text-medium-emphasis">permissões no token</div>
-        </v-card-text>
+        <v-list class="bg-transparent" density="comfortable" lines="two">
+          <v-list-item
+            v-for="step in nextSteps"
+            :key="step.title"
+            :prepend-icon="step.icon"
+            :subtitle="step.description"
+            :title="step.title"
+          >
+            <template #append>
+              <v-btn color="primary" size="small" variant="text">Abrir</v-btn>
+            </template>
+          </v-list-item>
+        </v-list>
       </v-card>
-    </v-col>
 
-    <v-col cols="12" md="6" xl="3">
-      <v-card class="h-100" rounded="xl">
-        <v-card-item subtitle="Guardados por plano" title="Módulos SaaS" />
+      <v-card class="surface-card" variant="flat">
+        <v-card-item subtitle="Informacoes da sessao" title="Resumo da empresa" />
         <v-card-text>
-          <div class="text-h4 font-weight-bold">{{ session.state.enabledModules.length }}</div>
-          <div class="text-body-2 text-medium-emphasis">módulos habilitados</div>
+          <div class="text-body-2 mb-2">
+            Empresa: <strong>{{ session.state.tenant?.name || 'Nao identificada' }}</strong>
+          </div>
+          <div class="text-body-2 mb-2">
+            Codigo: <strong>{{ session.state.tenant?.slug || '--' }}</strong>
+          </div>
+          <div class="text-body-2 mb-2">
+            Usuario: <strong>{{ session.state.session?.user.name || '-' }}</strong>
+          </div>
+          <div class="text-body-2 text-medium-emphasis">
+            Recursos ativos: {{ enabledModulesLabel }}
+          </div>
         </v-card-text>
       </v-card>
     </v-col>
   </v-row>
-
-  <v-card class="mb-6" rounded="xl">
-    <v-card-item subtitle="Fonte: GET /saas/tenant-modules/enabled" title="Módulos habilitados para este tenant" />
-    <v-card-text>
-      <div class="d-flex flex-wrap ga-2 mb-4">
-        <v-chip
-          v-for="moduleCode in session.state.enabledModules"
-          :key="moduleCode"
-          color="primary"
-          variant="tonal"
-        >
-          {{ MODULE_LABELS[moduleCode] }}
-        </v-chip>
-
-        <v-chip v-if="session.state.enabledModules.length === 0" color="warning" variant="outlined">
-          Nenhum módulo ativo
-        </v-chip>
-      </div>
-
-      <v-alert v-if="lockedModules.length > 0" class="mb-3" type="warning" variant="tonal">
-        O plano atual não libera: <strong>{{ lockedModules.join(', ') }}</strong>.
-      </v-alert>
-
-      <v-alert type="info" variant="tonal">
-        Base de integração ativa: <strong>{{ apiBase }}</strong>
-      </v-alert>
-    </v-card-text>
-  </v-card>
-
-  <v-card rounded="xl">
-    <v-card-item subtitle="Sequência para evolução do front" title="Ordem prática recomendada" />
-    <v-card-text>
-      <v-timeline align="start" density="compact" side="end">
-        <v-timeline-item v-for="item in roadmap" :key="item.title" :dot-color="item.color" size="small">
-          <div class="text-subtitle-1 font-weight-bold">{{ item.title }}</div>
-          <p class="text-body-2 text-medium-emphasis">{{ item.description }}</p>
-        </v-timeline-item>
-      </v-timeline>
-    </v-card-text>
-  </v-card>
 </template>
 
 <script setup lang="ts">
-  import type { ModuleCode } from '@/types/auth'
   import { computed } from 'vue'
+  import MetricCard from '@/components/ui/MetricCard.vue'
+  import PageHeader from '@/components/ui/PageHeader.vue'
+  import StatusChip from '@/components/ui/StatusChip.vue'
   import { MODULE_LABELS } from '@/config/navigation'
   import { useSessionStore } from '@/stores/session'
 
   const session = useSessionStore()
-  const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || '/api/v1'
 
-  const allModules: ModuleCode[] = ['logistics', 'fleet', 'financial']
-
-  const lockedModules = computed(() => {
-    return allModules
-      .filter(moduleCode => !session.state.enabledModules.includes(moduleCode))
-      .map(moduleCode => MODULE_LABELS[moduleCode])
-  })
-
-  const roadmap = [
+  const metrics = [
     {
-      title: 'Prioridade 1: shell e sessão',
-      description: 'Login, registro inicial, recuperação de sessão e menus dinâmicos por permissão/módulo.',
-      color: 'primary',
+      label: 'Pedidos em aberto',
+      value: '24',
+      description: '6 com prioridade alta',
+      icon: 'mdi-receipt-text-outline',
+      iconColor: 'primary',
     },
     {
-      title: 'Prioridade 2: backoffice administrativo',
-      description: 'Empresas, usuários, roles, permissões, vínculos, tenant/settings e auditoria.',
-      color: 'secondary',
+      label: 'Entregas em andamento',
+      value: '12',
+      description: '3 exigem acompanhamento',
+      icon: 'mdi-truck-delivery-outline',
+      iconColor: 'secondary',
     },
     {
-      title: 'Prioridade 3: operação logística',
-      description: 'Motoristas, veículos, manutenção, pedidos, rotas/paradas, frete, shipments e fiscal.',
-      color: 'teal',
+      label: 'Pendencias criticas',
+      value: '5',
+      description: 'Bloqueios com impacto imediato',
+      icon: 'mdi-alert-outline',
+      iconColor: 'warning',
     },
     {
-      title: 'Prioridade 4: financeiro',
-      description: 'Cadastros mestres, AP/AR, bancos, reconciliação, fluxo de caixa e relatórios.',
-      color: 'amber',
-    },
-    {
-      title: 'Prioridade 5: billing SaaS',
-      description: 'Planos, assinatura atual, checkout, pagamentos e métricas de uso por tenant.',
-      color: 'deep-orange',
+      label: 'Resultado de hoje',
+      value: formatCurrency(17_850),
+      description: 'Atualizado ate 17:30',
+      icon: 'mdi-cash-check',
+      iconColor: 'success',
     },
   ]
+
+  const priorities = [
+    {
+      id: 'prio-1',
+      task: 'Validar coleta do pedido #10342',
+      area: 'Operacao',
+      owner: 'Equipe Sul',
+      deadline: 'Hoje, 18:00',
+      status: 'pending',
+    },
+    {
+      id: 'prio-2',
+      task: 'Ajustar divergencia de conciliacao bancaria',
+      area: 'Financeiro',
+      owner: 'Ana Martins',
+      deadline: 'Hoje, 17:00',
+      status: 'warning',
+    },
+    {
+      id: 'prio-3',
+      task: 'Concluir cadastro de novo motorista',
+      area: 'Frota',
+      owner: 'Carlos Silva',
+      deadline: 'Amanha, 10:00',
+      status: 'active',
+    },
+  ]
+
+  const performanceRows = [
+    {
+      period: 'Ultimos 7 dias',
+      orders: 146,
+      onTimeDelivery: 93,
+      revenue: 124_380,
+      status: 'active',
+    },
+    {
+      period: 'Semana anterior',
+      orders: 131,
+      onTimeDelivery: 90,
+      revenue: 113_940,
+      status: 'active',
+    },
+    {
+      period: 'Media mensal',
+      orders: 612,
+      onTimeDelivery: 89,
+      revenue: 487_200,
+      status: 'pending',
+    },
+  ]
+
+  const nextSteps = [
+    {
+      title: 'Revisar pedidos atrasados',
+      description: 'Identifique gargalos e replaneje entregas com risco.',
+      icon: 'mdi-timer-alert-outline',
+    },
+    {
+      title: 'Conferir contas a vencer',
+      description: 'Evite atraso em pagamentos e mantenha o caixa equilibrado.',
+      icon: 'mdi-calendar-alert',
+    },
+    {
+      title: 'Atualizar capacidade de frota',
+      description: 'Antecipe faltas de veiculo e redistribua rotas.',
+      icon: 'mdi-truck-cargo-container',
+    },
+  ]
+
+  const enabledModulesLabel = computed(() => {
+    if (session.state.enabledModules.length === 0) return 'Nenhum recurso ativo'
+
+    return session.state.enabledModules.map(moduleCode => MODULE_LABELS[moduleCode]).join(', ')
+  })
+
+  function formatCurrency (value: number): string {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      maximumFractionDigits: 0,
+    }).format(value)
+  }
 </script>

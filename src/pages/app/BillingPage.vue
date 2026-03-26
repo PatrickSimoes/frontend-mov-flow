@@ -1,77 +1,66 @@
 <template>
-  <v-row class="mb-4">
-    <v-col cols="12" lg="4">
-      <v-card class="h-100" rounded="xl">
-        <v-card-item subtitle="GET /saas/subscriptions/current" title="Assinatura atual" />
-        <v-card-text>
-          <div v-if="currentSubscription">
-            <v-chip class="mb-3" :color="statusColor(currentSubscription.status)" variant="flat">
-              {{ currentSubscription.status }}
-            </v-chip>
-            <div class="text-body-2">
-              Plano: <strong>{{ currentSubscription.plan?.name || currentSubscription.planId }}</strong>
-            </div>
-            <div class="text-body-2 text-medium-emphasis">
-              Vigência: {{ formatDate(currentSubscription.currentPeriodStart) }} até
-              {{ formatDate(currentSubscription.currentPeriodEnd) }}
-            </div>
-          </div>
+  <PageHeader
+    eyebrow="Conta"
+    subtitle="Gerencie plano, historico de cobranca e consumo de recursos em um unico lugar."
+    title="Assinatura"
+  >
+    <template #actions>
+      <v-btn color="primary" prepend-icon="mdi-refresh" variant="tonal" @click="loadBillingData">
+        Atualizar
+      </v-btn>
+    </template>
+  </PageHeader>
 
-          <v-alert v-else type="info" variant="tonal">
-            Sem assinatura carregada (ou sem permissão <code>saas.subscriptions.read</code>).
-          </v-alert>
-        </v-card-text>
-      </v-card>
+  <v-alert v-if="errorMessage" class="mb-4" type="error" variant="tonal">
+    {{ errorMessage }}
+  </v-alert>
+
+  <v-row class="mb-2">
+    <v-col cols="12" lg="3" sm="6">
+      <MetricCard
+        :description="subscriptionDescription"
+        icon="mdi-card-account-details-outline"
+        label="Plano atual"
+        :value="currentSubscription?.plan?.name || 'Sem plano ativo'"
+      />
     </v-col>
-
-    <v-col cols="12" lg="4">
-      <v-card class="h-100" rounded="xl">
-        <v-card-item subtitle="GET /saas/payments" title="Pagamentos" />
-        <v-card-text>
-          <div class="text-h4 font-weight-bold">{{ payments.length }}</div>
-          <div class="text-body-2 text-medium-emphasis mb-3">pagamentos carregados</div>
-
-          <v-list class="pa-0 bg-transparent" density="compact">
-            <v-list-item v-for="payment in payments.slice(0, 3)" :key="payment.id">
-              <v-list-item-title class="text-body-2">
-                {{ formatCurrency(payment.amount, payment.currency) }}
-              </v-list-item-title>
-              <v-list-item-subtitle>
-                {{ payment.status }} • {{ formatDate(payment.createdAt) }}
-              </v-list-item-subtitle>
-            </v-list-item>
-          </v-list>
-        </v-card-text>
-      </v-card>
+    <v-col cols="12" lg="3" sm="6">
+      <MetricCard
+        :description="renewalDescription"
+        icon="mdi-calendar-clock-outline"
+        icon-color="secondary"
+        label="Status"
+        :value="
+          currentSubscription
+            ? formatSubscriptionStatus(currentSubscription.status)
+            : 'Nao disponivel'
+        "
+      />
     </v-col>
-
-    <v-col cols="12" lg="4">
-      <v-card class="h-100" rounded="xl">
-        <v-card-item subtitle="GET /saas/usage" title="Uso" />
-        <v-card-text>
-          <div class="text-h4 font-weight-bold">{{ usage.length }}</div>
-          <div class="text-body-2 text-medium-emphasis mb-3">métricas retornadas</div>
-
-          <v-list class="pa-0 bg-transparent" density="compact">
-            <v-list-item v-for="item in usage.slice(0, 3)" :key="item.id">
-              <v-list-item-title class="text-body-2">{{ item.metric }}</v-list-item-title>
-              <v-list-item-subtitle>
-                {{ item.usageCount }} no período {{ formatDate(item.periodStart) }} - {{ formatDate(item.periodEnd) }}
-              </v-list-item-subtitle>
-            </v-list-item>
-          </v-list>
-        </v-card-text>
-      </v-card>
+    <v-col cols="12" lg="3" sm="6">
+      <MetricCard
+        :description="'Ultimos registros de cobranca'"
+        icon="mdi-cash-check"
+        icon-color="success"
+        label="Pagamentos"
+        :value="String(payments.length)"
+      />
+    </v-col>
+    <v-col cols="12" lg="3" sm="6">
+      <MetricCard
+        :description="'Metricas do periodo atual'"
+        icon="mdi-speedometer"
+        icon-color="info"
+        label="Consumo monitorado"
+        :value="String(usage.length)"
+      />
     </v-col>
   </v-row>
 
-  <v-card class="mb-6" rounded="xl">
-    <v-card-item subtitle="GET /saas/plans" title="Planos disponíveis" />
-    <v-card-text>
-      <v-alert v-if="errorMessage" class="mb-4" type="error" variant="tonal">
-        {{ errorMessage }}
-      </v-alert>
+  <v-card class="surface-card mb-4" variant="flat">
+    <v-card-item subtitle="Escolha o plano ideal para a sua empresa" title="Planos disponiveis" />
 
+    <v-card-text>
       <v-row>
         <v-col
           v-for="plan in plans"
@@ -80,25 +69,25 @@
           lg="4"
           md="6"
         >
-          <v-card class="h-100" rounded="lg" variant="outlined">
+          <v-card class="h-100" color="surface" variant="outlined">
             <v-card-item>
-              <div class="d-flex align-center justify-space-between">
+              <div class="d-flex align-center justify-space-between ga-2">
                 <div class="text-subtitle-1 font-weight-bold">{{ plan.name }}</div>
                 <v-chip color="primary" size="small" variant="tonal">{{ plan.code }}</v-chip>
               </div>
-              <div class="text-body-2 text-medium-emphasis mt-2">{{ plan.description || 'Sem descrição' }}</div>
+              <div class="text-body-2 text-medium-emphasis mt-2">
+                {{ plan.description || 'Plano sem descricao' }}
+              </div>
             </v-card-item>
 
             <v-card-text>
               <div class="text-h5 font-weight-bold mb-2">
-                {{ formatCurrency(plan.monthlyPrice, plan.currency) }}/mês
+                {{ formatCurrency(plan.monthlyPrice, plan.currency) }}/mes
               </div>
-
               <div class="text-caption text-medium-emphasis">
-                Limites:
-                usuários {{ plan.maxUsers ?? '∞' }},
-                veículos {{ plan.maxVehicles ?? '∞' }},
-                shipments {{ plan.maxShipments ?? '∞' }}
+                Limites: usuarios {{ plan.maxUsers ?? 'Ilimitado' }}, veiculos
+                {{ plan.maxVehicles ?? 'Ilimitado' }}, entregas
+                {{ plan.maxShipments ?? 'Ilimitado' }}.
               </div>
             </v-card-text>
 
@@ -111,7 +100,7 @@
                 prepend-icon="mdi-credit-card-fast-outline"
                 @click="startCheckout(plan.id)"
               >
-                {{ canCheckout ? 'Assinar plano' : 'Sem permissão de checkout' }}
+                {{ canCheckout ? 'Assinar plano' : 'Sem permissao para contratar' }}
               </v-btn>
             </v-card-actions>
           </v-card>
@@ -119,19 +108,76 @@
       </v-row>
 
       <v-alert v-if="plans.length === 0 && !loading" type="info" variant="tonal">
-        Nenhum plano carregado ou sem permissão para leitura de planos.
+        Nenhum plano disponivel para exibicao no momento.
       </v-alert>
     </v-card-text>
   </v-card>
 
-  <CapabilityGrid :items="billingCapabilities" />
+  <v-row>
+    <v-col cols="12" xl="7">
+      <v-card class="surface-card" variant="flat">
+        <v-card-item subtitle="Historico recente" title="Pagamentos" />
+
+        <v-table class="table-wrapper" density="comfortable">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Valor</th>
+              <th>Forma</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="payment in payments" :key="payment.id">
+              <td>{{ formatDate(payment.createdAt) }}</td>
+              <td>{{ formatCurrency(payment.amount, payment.currency) }}</td>
+              <td>{{ formatProvider(payment.provider) }}</td>
+              <td>
+                <StatusChip :status="payment.status.toLowerCase()" />
+              </td>
+            </tr>
+            <tr v-if="payments.length === 0 && !loading">
+              <td class="text-center text-medium-emphasis py-6" colspan="4">
+                Sem pagamentos registrados para este periodo.
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+      </v-card>
+    </v-col>
+
+    <v-col cols="12" xl="5">
+      <v-card class="surface-card" variant="flat">
+        <v-card-item subtitle="Uso por indicador" title="Consumo" />
+
+        <v-list class="bg-transparent" density="comfortable" lines="two">
+          <v-list-item v-for="item in usage" :key="item.id" :title="formatMetric(item.metric)">
+            <v-list-item-subtitle>
+              {{ item.usageCount }} no periodo {{ formatDate(item.periodStart) }} -
+              {{ formatDate(item.periodEnd) }}
+            </v-list-item-subtitle>
+
+            <template #append>
+              <v-chip color="info" size="small" variant="tonal">{{ item.usageCount }}</v-chip>
+            </template>
+          </v-list-item>
+
+          <v-list-item
+            v-if="usage.length === 0 && !loading"
+            title="Sem dados de consumo para o periodo atual."
+          />
+        </v-list>
+      </v-card>
+    </v-col>
+  </v-row>
 </template>
 
 <script setup lang="ts">
-  import type { CapabilityItem } from '@/types/capability'
   import type { SaaSPayment, SaaSPlan, SaaSSubscription, TenantUsage } from '@/types/saas'
   import { computed, onMounted, ref } from 'vue'
-  import CapabilityGrid from '@/components/app/CapabilityGrid.vue'
+  import MetricCard from '@/components/ui/MetricCard.vue'
+  import PageHeader from '@/components/ui/PageHeader.vue'
+  import StatusChip from '@/components/ui/StatusChip.vue'
   import { saasApi } from '@/services/api'
   import { ApiError } from '@/services/http'
   import { useSessionStore } from '@/stores/session'
@@ -148,6 +194,22 @@
   const usage = ref<TenantUsage[]>([])
 
   const canCheckout = computed(() => session.hasPermission('saas.subscriptions.checkout'))
+
+  const subscriptionDescription = computed(() => {
+    if (!currentSubscription.value) {
+      return 'Sem assinatura ativa no momento'
+    }
+
+    return `Ciclo atual ate ${formatDate(currentSubscription.value.currentPeriodEnd)}`
+  })
+
+  const renewalDescription = computed(() => {
+    if (!currentSubscription.value) {
+      return 'Verifique os planos disponiveis'
+    }
+
+    return `Inicio do ciclo: ${formatDate(currentSubscription.value.currentPeriodStart)}`
+  })
 
   async function loadBillingData () {
     loading.value = true
@@ -187,12 +249,12 @@
       try {
         usage.value = await saasApi.listUsage()
       } catch (error) {
-        failures.push(error instanceof Error ? error.message : 'Falha ao carregar uso.')
+        failures.push(error instanceof Error ? error.message : 'Falha ao carregar consumo.')
       }
     }
 
     if (failures.length > 0) {
-      errorMessage.value = failures[0] ?? 'Erro ao carregar dados de billing.'
+      errorMessage.value = failures[0] ?? 'Erro ao carregar dados de assinatura.'
     }
 
     loading.value = false
@@ -217,7 +279,9 @@
       window.location.assign(checkoutSession.url)
     } catch (error) {
       errorMessage.value
-        = error instanceof ApiError ? error.message : 'Não foi possível iniciar checkout de assinatura.'
+        = error instanceof ApiError
+          ? error.message
+          : 'Nao foi possivel iniciar o processo de assinatura.'
     } finally {
       checkoutLoadingPlanId.value = null
     }
@@ -237,52 +301,27 @@
     }).format(Number(value))
   }
 
-  function statusColor (status: SaaSSubscription['status']): string {
-    if (status === 'ACTIVE' || status === 'TRIALING') return 'success'
-    if (status === 'PAST_DUE' || status === 'INCOMPLETE') return 'warning'
-    return 'error'
+  function formatProvider (provider: SaaSPayment['provider']): string {
+    if (provider === 'STRIPE') return 'Cartao / Stripe'
+    return 'Interno'
+  }
+
+  function formatSubscriptionStatus (status: SaaSSubscription['status']): string {
+    if (status === 'TRIALING') return 'Periodo de teste'
+    if (status === 'ACTIVE') return 'Ativa'
+    if (status === 'PAST_DUE') return 'Atrasada'
+    if (status === 'INCOMPLETE') return 'Pendente'
+    return 'Cancelada'
+  }
+
+  function formatMetric (metric: string): string {
+    if (metric === 'users') return 'Usuarios ativos'
+    if (metric === 'vehicles') return 'Veiculos em uso'
+    if (metric === 'shipments') return 'Entregas processadas'
+    return metric
   }
 
   onMounted(() => {
     void loadBillingData()
   })
-
-  const billingCapabilities: CapabilityItem[] = [
-    {
-      title: 'Planos',
-      description: 'Consulta dos planos SaaS disponíveis para contratação.',
-      endpoints: ['GET /saas/plans'],
-      permissionsAll: ['saas.plans.read'],
-    },
-    {
-      title: 'Assinatura Atual',
-      description: 'Consulta do plano ativo e janela de ciclo vigente.',
-      endpoints: ['GET /saas/subscriptions/current'],
-      permissionsAll: ['saas.subscriptions.read'],
-    },
-    {
-      title: 'Checkout de Assinatura',
-      description: 'Criação de sessão Stripe com successUrl/cancelUrl definidos pelo front.',
-      endpoints: ['POST /saas/subscriptions/checkout'],
-      permissionsAll: ['saas.subscriptions.checkout'],
-    },
-    {
-      title: 'Pagamentos',
-      description: 'Histórico de pagamentos do tenant para billing center.',
-      endpoints: ['GET /saas/payments'],
-      permissionsAll: ['saas.payments.read'],
-    },
-    {
-      title: 'Uso',
-      description: 'Métricas de consumo por período para visibilidade de limites.',
-      endpoints: ['GET /saas/usage'],
-      permissionsAll: ['saas.usage.read'],
-    },
-    {
-      title: 'Módulos Habilitados',
-      description: 'Feature-flag por tenant para liberar ou ocultar áreas do sistema.',
-      endpoints: ['GET /saas/tenant-modules/enabled'],
-      permissionsAll: ['saas.modules.read'],
-    },
-  ]
 </script>
