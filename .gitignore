@@ -5,8 +5,14 @@ src/components.d.ts
 src/typed-router.d.ts
 
 # local env files
+.env
+.env.development
+.env.test
+.env.production
+.env.staging
 .env.local
 .env.*.local
+!.env.production.example
 
 # Log files
 npm-debug.log*
