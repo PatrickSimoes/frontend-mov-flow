@@ -5,14 +5,28 @@
     title="Painel"
   >
     <template #actions>
-      <v-btn color="primary" prepend-icon="mdi-refresh" variant="tonal">Atualizar dados</v-btn>
       <v-btn
-        prepend-icon="mdi-open-in-new"
-        to="/app/operations"
-        variant="outlined"
-      >Abrir operacao</v-btn>
+        color="primary"
+        :loading="loading"
+        prepend-icon="mdi-refresh"
+        variant="tonal"
+        @click="loadDashboardData"
+      >
+        Atualizar dados
+      </v-btn>
+      <v-btn prepend-icon="mdi-open-in-new" to="/app/operations" variant="outlined">
+        Abrir operacao
+      </v-btn>
     </template>
   </PageHeader>
+
+  <v-alert v-if="errorMessage" class="mb-4" type="error" variant="tonal">
+    {{ errorMessage }}
+  </v-alert>
+
+  <v-alert v-if="!canReadAnyDashboardData" class="mb-4" type="info" variant="tonal">
+    Seu perfil nao possui permissao para visualizar dados do painel.
+  </v-alert>
 
   <v-row class="mb-2">
     <v-col
@@ -32,7 +46,7 @@
     </v-col>
   </v-row>
 
-  <v-row>
+  <v-row v-if="canReadAnyDashboardData">
     <v-col cols="12" xl="8">
       <v-card class="surface-card mb-4" variant="flat">
         <v-card-item subtitle="Itens que impactam prazo e faturamento" title="Prioridades do dia" />
@@ -48,7 +62,17 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in priorities" :key="item.id">
+            <tr v-if="loading">
+              <td class="text-center text-medium-emphasis py-6" colspan="5">
+                Carregando prioridades...
+              </td>
+            </tr>
+            <tr v-else-if="priorities.length === 0">
+              <td class="text-center text-medium-emphasis py-6" colspan="5">
+                Nenhuma prioridade critica no momento.
+              </td>
+            </tr>
+            <tr v-for="item in priorities" v-else :key="item.id">
               <td class="font-weight-medium">{{ item.task }}</td>
               <td>{{ item.area }}</td>
               <td>{{ item.owner }}</td>
@@ -62,23 +86,28 @@
       </v-card>
 
       <v-card class="surface-card" variant="flat">
-        <v-card-item subtitle="Ultimos 7 dias" title="Desempenho recente" />
+        <v-card-item subtitle="Visao comparativa por periodo" title="Desempenho recente" />
 
         <v-table class="table-wrapper" density="comfortable">
           <thead>
             <tr>
               <th>Periodo</th>
               <th>Pedidos</th>
-              <th>Entregas no prazo</th>
-              <th>Faturamento</th>
+              <th>Entregas concluidas</th>
+              <th>Receita</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in performanceRows" :key="row.period">
+            <tr v-if="loading">
+              <td class="text-center text-medium-emphasis py-6" colspan="5">
+                Carregando desempenho...
+              </td>
+            </tr>
+            <tr v-for="row in performanceRows" v-else :key="row.period">
               <td>{{ row.period }}</td>
               <td>{{ row.orders }}</td>
-              <td>{{ row.onTimeDelivery }}%</td>
+              <td>{{ row.deliveries }}</td>
               <td>{{ formatCurrency(row.revenue) }}</td>
               <td>
                 <StatusChip :status="row.status" />
@@ -102,7 +131,7 @@
             :title="step.title"
           >
             <template #append>
-              <v-btn color="primary" size="small" variant="text">Abrir</v-btn>
+              <v-btn color="primary" size="small" :to="step.to" variant="text">Abrir</v-btn>
             </template>
           </v-list-item>
         </v-list>
@@ -130,114 +159,71 @@
 </template>
 
 <script setup lang="ts">
-  import { computed } from 'vue'
+  import type {
+    CashFlowEntry,
+    FinancialCashFlowReport,
+    FinancialDashboardReport,
+    FinancialOverdueReport,
+  } from '@/types/financial'
+  import type { Order, Shipment } from '@/types/operations'
+  import { computed, onMounted, ref } from 'vue'
   import MetricCard from '@/components/ui/MetricCard.vue'
   import PageHeader from '@/components/ui/PageHeader.vue'
   import StatusChip from '@/components/ui/StatusChip.vue'
   import { MODULE_LABELS } from '@/config/navigation'
+  import { financialApi, operationsApi } from '@/services/api'
+  import { ApiError } from '@/services/http'
   import { useSessionStore } from '@/stores/session'
+
+  interface PriorityRow {
+    id: string
+    task: string
+    area: string
+    owner: string
+    deadline: string
+    status: string
+    createdAt: string
+  }
+
+  interface PerformanceRow {
+    period: string
+    orders: number
+    deliveries: number
+    revenue: number
+    status: string
+  }
 
   const session = useSessionStore()
 
-  const metrics = [
-    {
-      label: 'Pedidos em aberto',
-      value: '24',
-      description: '6 com prioridade alta',
-      icon: 'mdi-receipt-text-outline',
-      iconColor: 'primary',
-    },
-    {
-      label: 'Entregas em andamento',
-      value: '12',
-      description: '3 exigem acompanhamento',
-      icon: 'mdi-truck-delivery-outline',
-      iconColor: 'secondary',
-    },
-    {
-      label: 'Pendencias criticas',
-      value: '5',
-      description: 'Bloqueios com impacto imediato',
-      icon: 'mdi-alert-outline',
-      iconColor: 'warning',
-    },
-    {
-      label: 'Resultado de hoje',
-      value: formatCurrency(17_850),
-      description: 'Atualizado ate 17:30',
-      icon: 'mdi-cash-check',
-      iconColor: 'success',
-    },
-  ]
+  const loading = ref(false)
+  const errorMessage = ref<string | null>(null)
 
-  const priorities = [
-    {
-      id: 'prio-1',
-      task: 'Validar coleta do pedido #10342',
-      area: 'Operacao',
-      owner: 'Equipe Sul',
-      deadline: 'Hoje, 18:00',
-      status: 'pending',
-    },
-    {
-      id: 'prio-2',
-      task: 'Ajustar divergencia de conciliacao bancaria',
-      area: 'Financeiro',
-      owner: 'Ana Martins',
-      deadline: 'Hoje, 17:00',
-      status: 'warning',
-    },
-    {
-      id: 'prio-3',
-      task: 'Concluir cadastro de novo motorista',
-      area: 'Frota',
-      owner: 'Carlos Silva',
-      deadline: 'Amanha, 10:00',
-      status: 'active',
-    },
-  ]
+  const orders = ref<Order[]>([])
+  const shipments = ref<Shipment[]>([])
+  const cashFlowToday = ref<CashFlowEntry[]>([])
+  const financialDashboard = ref<FinancialDashboardReport | null>(null)
+  const overdueReport = ref<FinancialOverdueReport | null>(null)
+  const cashFlowReports = ref<Record<string, FinancialCashFlowReport | null>>({
+    '7d': null,
+    '30d': null,
+    'month': null,
+  })
 
-  const performanceRows = [
-    {
-      period: 'Ultimos 7 dias',
-      orders: 146,
-      onTimeDelivery: 93,
-      revenue: 124_380,
-      status: 'active',
-    },
-    {
-      period: 'Semana anterior',
-      orders: 131,
-      onTimeDelivery: 90,
-      revenue: 113_940,
-      status: 'active',
-    },
-    {
-      period: 'Media mensal',
-      orders: 612,
-      onTimeDelivery: 89,
-      revenue: 487_200,
-      status: 'pending',
-    },
-  ]
+  const canReadOrders = computed(() => session.hasPermission('orders.read'))
+  const canReadShipments = computed(() => session.hasPermission('shipments.read'))
+  const canReadCashFlow = computed(() => session.hasPermission('financial.cash-flow.read'))
+  const canReadFinancialDashboard = computed(() => session.hasPermission('financial.dashboard.read'))
+  const canReadFinancialReports = computed(() => session.hasPermission('financial.reports.read'))
 
-  const nextSteps = [
-    {
-      title: 'Revisar pedidos atrasados',
-      description: 'Identifique gargalos e replaneje entregas com risco.',
-      icon: 'mdi-timer-alert-outline',
-    },
-    {
-      title: 'Conferir contas a vencer',
-      description: 'Evite atraso em pagamentos e mantenha o caixa equilibrado.',
-      icon: 'mdi-calendar-alert',
-    },
-    {
-      title: 'Atualizar capacidade de frota',
-      description: 'Antecipe faltas de veiculo e redistribua rotas.',
-      icon: 'mdi-truck-cargo-container',
-    },
-  ]
+  const canReadAnyDashboardData = computed(() => {
+    return (
+      canReadOrders.value
+      || canReadShipments.value
+      || canReadCashFlow.value
+      || canReadFinancialDashboard.value
+      || canReadFinancialReports.value
+    )
+  })
 
   const enabledModulesLabel = computed(() => {
     if (session.state.enabledModules.length === 0) return 'Nenhum recurso ativo'
@@ -245,11 +231,439 @@
     return session.state.enabledModules.map(moduleCode => MODULE_LABELS[moduleCode]).join(', ')
   })
 
+  const openOrdersCount = computed(() => {
+    return orders.value.filter(order => ['OPEN', 'CONFIRMED', 'SHIPPED'].includes(order.status))
+      .length
+  })
+
+  const inProgressShipmentsCount = computed(() => {
+    return shipments.value.filter(shipment =>
+      ['CREATED', 'ASSIGNED', 'IN_TRANSIT'].includes(shipment.status),
+    ).length
+  })
+
+  const criticalPendingCount = computed(() => {
+    const overdueCount = overdueReport.value
+      ? overdueReport.value.totals.payableCount + overdueReport.value.totals.receivableCount
+      : 0
+    const canceledShipments = shipments.value.filter(
+      shipment => shipment.status === 'CANCELED',
+    ).length
+
+    return overdueCount + canceledShipments
+  })
+
+  const todayResult = computed(() => {
+    if (cashFlowToday.value.length > 0) {
+      const total = cashFlowToday.value.reduce((acc, entry) => {
+        const amount = toNumber(entry.amount)
+        return acc + (entry.type === 'IN' ? amount : -amount)
+      }, 0)
+      return total
+    }
+
+    return financialDashboard.value?.netBalance ?? 0
+  })
+
+  const metrics = computed(() => {
+    return [
+      {
+        label: 'Pedidos em aberto',
+        value: String(openOrdersCount.value),
+        description: 'Pedidos ativos aguardando conclusao',
+        icon: 'mdi-receipt-text-outline',
+        iconColor: 'primary',
+      },
+      {
+        label: 'Entregas em andamento',
+        value: String(inProgressShipmentsCount.value),
+        description: 'Viagens criadas, atribuidas ou em transito',
+        icon: 'mdi-truck-delivery-outline',
+        iconColor: 'secondary',
+      },
+      {
+        label: 'Pendencias criticas',
+        value: String(criticalPendingCount.value),
+        description: 'Itens com risco operacional ou financeiro',
+        icon: 'mdi-alert-outline',
+        iconColor: 'warning',
+      },
+      {
+        label: 'Resultado de hoje',
+        value: formatCurrency(todayResult.value),
+        description: 'Saldo registrado no fluxo do dia',
+        icon: 'mdi-cash-check',
+        iconColor: todayResult.value >= 0 ? 'success' : 'error',
+      },
+    ]
+  })
+
+  const priorities = computed<PriorityRow[]>(() => {
+    const rows: PriorityRow[] = []
+
+    if (overdueReport.value) {
+      for (const receivable of overdueReport.value.receivables.slice(0, 3)) {
+        rows.push({
+          id: `receivable-${receivable.id}`,
+          task: `Cobrar titulo ${receivable.documentNumber || receivable.id.slice(0, 8)}`,
+          area: 'Financeiro',
+          owner: 'Contas a receber',
+          deadline: formatDate(receivable.dueDate),
+          status: receivable.status,
+          createdAt: receivable.dueDate,
+        })
+      }
+
+      for (const payable of overdueReport.value.payables.slice(0, 3)) {
+        rows.push({
+          id: `payable-${payable.id}`,
+          task: `Regularizar pagamento ${payable.documentNumber || payable.id.slice(0, 8)}`,
+          area: 'Financeiro',
+          owner: 'Contas a pagar',
+          deadline: formatDate(payable.dueDate),
+          status: payable.status,
+          createdAt: payable.dueDate,
+        })
+      }
+    }
+
+    for (const shipment of shipments.value
+    .filter(item => item.status === 'IN_TRANSIT')
+    .slice(0, 3)) {
+      rows.push({
+        id: `shipment-${shipment.id}`,
+        task: `Acompanhar entrega SHP-${shipment.id.slice(0, 8).toUpperCase()}`,
+        area: 'Operacao',
+        owner: 'Expedicao',
+        deadline: shipment.deliveryDate ? formatDateTime(shipment.deliveryDate) : 'Sem previsao',
+        status: shipment.status,
+        createdAt: shipment.updatedAt,
+      })
+    }
+
+    for (const order of orders.value.filter(item => item.status === 'OPEN').slice(0, 3)) {
+      rows.push({
+        id: `order-${order.id}`,
+        task: `Confirmar pedido ${order.orderNumber}`,
+        area: 'Operacao',
+        owner: 'Atendimento',
+        deadline: formatDateTime(order.createdAt),
+        status: order.status,
+        createdAt: order.createdAt,
+      })
+    }
+
+    const sortedRows = [...rows]
+
+    sortedRows.sort((left, right) => {
+      return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+    })
+
+    return sortedRows.slice(0, 8)
+  })
+
+  const performanceRows = computed<PerformanceRow[]>(() => {
+    const now = new Date()
+    const sevenDaysRange = resolveDateRange(7)
+    const thirtyDaysRange = resolveDateRange(30)
+    const monthRange = {
+      from: toIsoDate(new Date(now.getFullYear(), now.getMonth(), 1)),
+      to: toIsoDate(now),
+    }
+
+    return [
+      {
+        period: 'Ultimos 7 dias',
+        orders: countOrdersInRange(orders.value, sevenDaysRange.from, sevenDaysRange.to),
+        deliveries: countDeliveredShipmentsInRange(
+          shipments.value,
+          sevenDaysRange.from,
+          sevenDaysRange.to,
+        ),
+        revenue: cashFlowReports.value['7d']?.totalIn ?? 0,
+        status: resolvePerformanceStatus(cashFlowReports.value['7d'] ?? null),
+      },
+      {
+        period: 'Ultimos 30 dias',
+        orders: countOrdersInRange(orders.value, thirtyDaysRange.from, thirtyDaysRange.to),
+        deliveries: countDeliveredShipmentsInRange(
+          shipments.value,
+          thirtyDaysRange.from,
+          thirtyDaysRange.to,
+        ),
+        revenue: cashFlowReports.value['30d']?.totalIn ?? 0,
+        status: resolvePerformanceStatus(cashFlowReports.value['30d'] ?? null),
+      },
+      {
+        period: 'Mes atual',
+        orders: countOrdersInRange(orders.value, monthRange.from, monthRange.to),
+        deliveries: countDeliveredShipmentsInRange(shipments.value, monthRange.from, monthRange.to),
+        revenue: cashFlowReports.value.month?.totalIn ?? 0,
+        status: resolvePerformanceStatus(cashFlowReports.value.month ?? null),
+      },
+    ]
+  })
+
+  const nextSteps = computed(() => {
+    const steps: Array<{ title: string, description: string, icon: string, to: string }> = []
+
+    if (criticalPendingCount.value > 0) {
+      steps.push({
+        title: 'Tratar pendencias criticas',
+        description: 'Ha itens com risco que podem impactar caixa e nivel de servico.',
+        icon: 'mdi-alert-circle-outline',
+        to: '/app/financial',
+      })
+    }
+
+    if (inProgressShipmentsCount.value > 0) {
+      steps.push({
+        title: 'Acompanhar entregas em andamento',
+        description: 'Monitore viagens em transito para reduzir atrasos.',
+        icon: 'mdi-truck-delivery-outline',
+        to: '/app/operations',
+      })
+    }
+
+    if (openOrdersCount.value > 0) {
+      steps.push({
+        title: 'Revisar carteira de pedidos',
+        description: 'Priorize pedidos abertos e atualize o planejamento da operacao.',
+        icon: 'mdi-receipt-text-outline',
+        to: '/app/operations',
+      })
+    }
+
+    if (steps.length === 0) {
+      steps.push({
+        title: 'Operacao estavel no momento',
+        description: 'Indicadores sem alertas criticos. Continue monitorando o painel.',
+        icon: 'mdi-check-circle-outline',
+        to: '/app/dashboard',
+      })
+    }
+
+    return steps
+  })
+
+  async function loadDashboardData () {
+    if (!canReadAnyDashboardData.value) return
+
+    loading.value = true
+    errorMessage.value = null
+
+    const today = toIsoDate(new Date())
+    const sevenDaysRange = resolveDateRange(7)
+    const thirtyDaysRange = resolveDateRange(30)
+    const monthStartRange = resolveMonthRange()
+    let failures: string[] = []
+    let tasks: Promise<void>[] = []
+    const addFailure = (message: string) => {
+      failures = [...failures, message]
+    }
+    const addTask = (task: Promise<void>) => {
+      tasks = [...tasks, task]
+    }
+
+    if (canReadOrders.value) {
+      addTask(
+        operationsApi
+          .listOrders({ page: 1, limit: 100 })
+          .then(result => {
+            orders.value = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar pedidos do painel.'))
+          }),
+      )
+    } else {
+      orders.value = []
+    }
+
+    if (canReadShipments.value) {
+      addTask(
+        operationsApi
+          .listShipments({ page: 1, limit: 100 })
+          .then(result => {
+            shipments.value = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar entregas do painel.'))
+          }),
+      )
+    } else {
+      shipments.value = []
+    }
+
+    if (canReadFinancialDashboard.value) {
+      addTask(
+        financialApi
+          .getDashboardReport(monthStartRange)
+          .then(result => {
+            financialDashboard.value = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar resumo financeiro.'))
+          }),
+      )
+    } else {
+      financialDashboard.value = null
+    }
+
+    if (canReadFinancialReports.value) {
+      addTask(
+        financialApi
+          .getOverdueReport({ ...monthStartRange, page: 1, limit: 20 })
+          .then(result => {
+            overdueReport.value = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar pendencias financeiras.'))
+          }),
+      )
+
+      const cashFlowTasks: Promise<void>[] = [
+        financialApi
+          .getCashFlowReport(sevenDaysRange)
+          .then(result => {
+            cashFlowReports.value['7d'] = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar desempenho dos ultimos 7 dias.'))
+          }),
+        financialApi
+          .getCashFlowReport(thirtyDaysRange)
+          .then(result => {
+            cashFlowReports.value['30d'] = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar desempenho dos ultimos 30 dias.'))
+          }),
+        financialApi
+          .getCashFlowReport(monthStartRange)
+          .then(result => {
+            cashFlowReports.value.month = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar desempenho do mes atual.'))
+          }),
+      ]
+
+      addTask(Promise.all(cashFlowTasks).then(() => undefined))
+    } else {
+      overdueReport.value = null
+      cashFlowReports.value = { '7d': null, '30d': null, 'month': null }
+    }
+
+    if (canReadCashFlow.value) {
+      addTask(
+        financialApi
+          .listCashFlow({ from: today, to: today, page: 1, limit: 100 })
+          .then(result => {
+            cashFlowToday.value = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar fluxo de caixa do dia.'))
+          }),
+      )
+    } else {
+      cashFlowToday.value = []
+    }
+
+    await Promise.all(tasks)
+
+    if (failures.length > 0) {
+      errorMessage.value = failures[0] ?? 'Falha ao carregar dados do painel.'
+    }
+
+    loading.value = false
+  }
+
+  function countOrdersInRange (items: Order[], from: string, to: string): number {
+    return items.filter(order => {
+      const date = toIsoDate(new Date(order.createdAt))
+      return date >= from && date <= to
+    }).length
+  }
+
+  function countDeliveredShipmentsInRange (items: Shipment[], from: string, to: string): number {
+    return items.filter(shipment => {
+      if (shipment.status !== 'DELIVERED' || !shipment.deliveryDate) return false
+      const date = toIsoDate(new Date(shipment.deliveryDate))
+      return date >= from && date <= to
+    }).length
+  }
+
+  function resolvePerformanceStatus (report: FinancialCashFlowReport | null): string {
+    if (!report) return 'info'
+    if (report.balance > 0) return 'success'
+    if (report.balance < 0) return 'warning'
+    return 'info'
+  }
+
+  function resolveDateRange (days: number): { from: string, to: string } {
+    const now = new Date()
+    const from = new Date(now)
+    from.setDate(now.getDate() - (days - 1))
+
+    return {
+      from: toIsoDate(from),
+      to: toIsoDate(now),
+    }
+  }
+
+  function resolveMonthRange (): { from: string, to: string } {
+    const now = new Date()
+
+    return {
+      from: toIsoDate(new Date(now.getFullYear(), now.getMonth(), 1)),
+      to: toIsoDate(now),
+    }
+  }
+
+  function resolveApiError (error: unknown, fallback: string): string {
+    if (error instanceof ApiError) return error.message
+    if (error instanceof Error) return error.message
+    return fallback
+  }
+
+  function toIsoDate (date: Date): string {
+    return date.toISOString().slice(0, 10)
+  }
+
+  function toNumber (value: unknown): number {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+
   function formatCurrency (value: number): string {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-      maximumFractionDigits: 0,
-    }).format(value)
+      maximumFractionDigits: 2,
+    }).format(toNumber(value))
   }
+
+  function formatDate (value: string): string {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return date.toLocaleDateString('pt-BR')
+  }
+
+  function formatDateTime (value: string): string {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+
+    return date.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  onMounted(() => {
+    void loadDashboardData()
+  })
 </script>
