@@ -1,4 +1,6 @@
 export { authApi } from './auth'
+export { financialApi } from './financial'
+export { operationsApi } from './operations'
 export { saasApi } from './saas'
 export { settingsApi } from './settings'
 export { tenantApi } from './tenant'
