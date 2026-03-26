@@ -5,45 +5,59 @@
     title="Financeiro"
   >
     <template #actions>
-      <v-btn color="primary" prepend-icon="mdi-plus" variant="flat">Novo lancamento</v-btn>
       <v-btn
-        prepend-icon="mdi-file-chart-outline"
-        to="/app/reports"
-        variant="outlined"
-      >Abrir relatorios</v-btn>
+        color="primary"
+        :loading="loading"
+        prepend-icon="mdi-refresh"
+        variant="flat"
+        @click="loadFinancialData"
+      >
+        Atualizar dados
+      </v-btn>
+      <v-btn prepend-icon="mdi-file-chart-outline" to="/app/reports" variant="outlined">
+        Abrir relatorios
+      </v-btn>
     </template>
   </PageHeader>
+
+  <v-alert v-if="errorMessage" class="mb-4" type="error" variant="tonal">
+    {{ errorMessage }}
+  </v-alert>
+
+  <v-alert v-if="!hasAnyFinancialPermission" class="mb-4" type="info" variant="tonal">
+    Seu perfil nao possui permissao para visualizar dados financeiros.
+  </v-alert>
 
   <v-row class="mb-2">
     <v-col cols="12" lg="3" sm="6">
       <MetricCard
-        description="Previsto para hoje"
+        description="Saldo previsto de recebimentos em aberto"
         icon="mdi-cash-plus"
         label="A receber"
-        :value="formatCurrency(42430)"
+        :value="formatCurrency(receivableOpenValue)"
       />
     </v-col>
     <v-col cols="12" lg="3" sm="6">
       <MetricCard
-        description="Pagamentos programados"
+        description="Compromissos em aberto para pagamento"
         icon="mdi-cash-minus"
         icon-color="warning"
         label="A pagar"
-        :value="formatCurrency(28150)"
+        :value="formatCurrency(payableOpenValue)"
       />
     </v-col>
     <v-col cols="12" lg="3" sm="6">
       <MetricCard
-        description="Saldo liquido estimado"
+        description="Saldo liquido do dia com base no fluxo registrado"
         icon="mdi-wallet-outline"
         icon-color="success"
         label="Resultado do dia"
-        :value="formatCurrency(14280)"
+        :value="formatCurrency(dailyNetResult)"
       />
     </v-col>
     <v-col cols="12" lg="3" sm="6">
       <MetricCard
-        description="Titulos com atraso"
+        description="Titulos vencidos que exigem acao"
         icon="mdi-alert-circle-outline"
         icon-color="error"
         label="Pendencias"
@@ -52,7 +66,7 @@
     </v-col>
   </v-row>
 
-  <v-row>
+  <v-row v-if="hasAnyFinancialPermission">
     <v-col cols="12" xl="8">
       <v-card class="surface-card mb-4" variant="flat">
         <v-card-item subtitle="Proximos vencimentos" title="Contas a receber" />
@@ -68,7 +82,17 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in receivableRows" :key="row.id">
+            <tr v-if="loading">
+              <td class="text-center text-medium-emphasis py-6" colspan="5">
+                Carregando contas a receber...
+              </td>
+            </tr>
+            <tr v-else-if="receivableRows.length === 0">
+              <td class="text-center text-medium-emphasis py-6" colspan="5">
+                Nenhuma conta a receber encontrada para o periodo.
+              </td>
+            </tr>
+            <tr v-for="row in receivableRows" v-else :key="row.id">
               <td class="font-weight-medium">{{ row.title }}</td>
               <td>{{ row.party }}</td>
               <td>{{ row.dueDate }}</td>
@@ -82,7 +106,7 @@
       </v-card>
 
       <v-card class="surface-card" variant="flat">
-        <v-card-item subtitle="Contas a vencer" title="Contas a pagar" />
+        <v-card-item subtitle="Contas com vencimento no periodo" title="Contas a pagar" />
 
         <v-table class="table-wrapper" density="comfortable">
           <thead>
@@ -95,7 +119,17 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in payableRows" :key="row.id">
+            <tr v-if="loading">
+              <td class="text-center text-medium-emphasis py-6" colspan="5">
+                Carregando contas a pagar...
+              </td>
+            </tr>
+            <tr v-else-if="payableRows.length === 0">
+              <td class="text-center text-medium-emphasis py-6" colspan="5">
+                Nenhuma conta a pagar encontrada para o periodo.
+              </td>
+            </tr>
+            <tr v-for="row in payableRows" v-else :key="row.id">
               <td class="font-weight-medium">{{ row.title }}</td>
               <td>{{ row.party }}</td>
               <td>{{ row.dueDate }}</td>
@@ -131,22 +165,32 @@
               </div>
             </template>
           </v-list-item>
+
+          <v-list-item
+            v-if="!loading && overdueRows.length === 0"
+            title="Nenhuma pendencia financeira no periodo selecionado."
+          />
         </v-list>
       </v-card>
 
       <v-card class="surface-card" variant="flat">
-        <v-card-item subtitle="Movimentacao da semana" title="Fluxo de caixa" />
+        <v-card-item subtitle="Movimentacao recente" title="Fluxo de caixa" />
 
         <v-list class="bg-transparent" density="compact">
           <v-list-item v-for="entry in cashFlowRows" :key="entry.id">
             <v-list-item-title class="d-flex justify-space-between ga-3">
               <span>{{ entry.label }}</span>
-              <span :class="entry.type === 'in' ? 'text-success' : 'text-error'">
-                {{ entry.type === 'in' ? '+' : '-' }}{{ formatCurrency(entry.amount) }}
+              <span :class="entry.type === 'IN' ? 'text-success' : 'text-error'">
+                {{ entry.type === 'IN' ? '+' : '-' }}{{ formatCurrency(entry.amount) }}
               </span>
             </v-list-item-title>
             <v-list-item-subtitle>{{ entry.date }}</v-list-item-subtitle>
           </v-list-item>
+
+          <v-list-item
+            v-if="!loading && cashFlowRows.length === 0"
+            title="Sem lancamentos recentes de fluxo de caixa."
+          />
         </v-list>
       </v-card>
     </v-col>
@@ -154,91 +198,424 @@
 </template>
 
 <script setup lang="ts">
+  import type {
+    AccountsPayableEntry,
+    AccountsReceivableEntry,
+    CashFlowEntry,
+    Customer,
+    FinancialDashboardReport,
+    FinancialOverdueReport,
+    Supplier,
+  } from '@/types/financial'
+  import { computed, onMounted, ref } from 'vue'
   import MetricCard from '@/components/ui/MetricCard.vue'
   import PageHeader from '@/components/ui/PageHeader.vue'
   import StatusChip from '@/components/ui/StatusChip.vue'
+  import { financialApi } from '@/services/api'
+  import { ApiError } from '@/services/http'
+  import { useSessionStore } from '@/stores/session'
 
-  const receivableRows = [
-    {
-      id: 'rec-1',
-      title: 'NF 59302',
-      party: 'Rede Nova Compra',
-      dueDate: 'Hoje',
-      amount: 12_450,
-      status: 'pending',
-    },
-    {
-      id: 'rec-2',
-      title: 'NF 59291',
-      party: 'Atacado Lima',
-      dueDate: 'Amanha',
-      amount: 9380,
-      status: 'open',
-    },
-    {
-      id: 'rec-3',
-      title: 'NF 59284',
-      party: 'Mercado Central',
-      dueDate: '03/04',
-      amount: 7060,
-      status: 'active',
-    },
-  ]
+  interface FinancialRow {
+    id: string
+    title: string
+    party: string
+    dueDate: string
+    amount: number
+    status: string
+  }
 
-  const payableRows = [
-    {
-      id: 'pay-1',
-      title: 'Combustivel - semana 14',
-      party: 'Posto Sul',
-      dueDate: 'Hoje',
-      amount: 8450,
-      status: 'pending',
-    },
-    {
-      id: 'pay-2',
-      title: 'Manutencao preventiva',
-      party: 'Oficina Delta',
-      dueDate: 'Amanha',
-      amount: 5320,
-      status: 'open',
-    },
-    {
-      id: 'pay-3',
-      title: 'Licenca de rastreamento',
-      party: 'TrackPro',
-      dueDate: '05/04',
-      amount: 2480,
-      status: 'active',
-    },
-  ]
+  interface OverdueAlertRow {
+    id: string
+    title: string
+    reason: string
+    amount: number
+  }
 
-  const overdueRows = [
-    {
-      id: 'ovd-1',
-      title: 'NF 59110 - Cobrar cliente',
-      reason: 'Atraso de 4 dias no recebimento',
-      amount: 3180,
-    },
-    {
-      id: 'ovd-2',
-      title: 'Combustivel - parcela 2',
-      reason: 'Vencimento ontem sem baixa',
-      amount: 2460,
-    },
-  ]
+  interface CashFlowRow {
+    id: string
+    label: string
+    date: string
+    amount: number
+    type: 'IN' | 'OUT'
+  }
 
-  const cashFlowRows = [
-    { id: 'cf-1', label: 'Recebimento de pedidos', date: 'Seg, 09:12', amount: 14_800, type: 'in' },
-    { id: 'cf-2', label: 'Pagamento de combustivel', date: 'Seg, 14:43', amount: 4650, type: 'out' },
-    { id: 'cf-3', label: 'Recebimento de servico', date: 'Ter, 10:20', amount: 9320, type: 'in' },
-    { id: 'cf-4', label: 'Pagamento de fornecedores', date: 'Ter, 17:05', amount: 5220, type: 'out' },
-  ] as const
+  const session = useSessionStore()
+
+  const loading = ref(false)
+  const errorMessage = ref<string | null>(null)
+
+  const receivables = ref<AccountsReceivableEntry[]>([])
+  const payables = ref<AccountsPayableEntry[]>([])
+  const cashFlowEntries = ref<CashFlowEntry[]>([])
+  const dashboardReport = ref<FinancialDashboardReport | null>(null)
+  const overdueReport = ref<FinancialOverdueReport | null>(null)
+  const customers = ref<Customer[]>([])
+  const suppliers = ref<Supplier[]>([])
+
+  const canReadFinancialEntries = computed(() => session.hasPermission('financial.read'))
+  const canReadCashFlow = computed(() => session.hasPermission('financial.cash-flow.read'))
+  const canReadDashboard = computed(() => session.hasPermission('financial.dashboard.read'))
+  const canReadReports = computed(() => session.hasPermission('financial.reports.read'))
+  const canReadMasterData = computed(() => session.hasPermission('financial.master.read'))
+
+  const hasAnyFinancialPermission = computed(() => {
+    return (
+      canReadFinancialEntries.value
+      || canReadCashFlow.value
+      || canReadDashboard.value
+      || canReadReports.value
+    )
+  })
+
+  const customerById = computed(() => {
+    return new Map(customers.value.map(customer => [customer.id, customer.name]))
+  })
+
+  const supplierById = computed(() => {
+    return new Map(suppliers.value.map(supplier => [supplier.id, supplier.name]))
+  })
+
+  const dateRange = computed(() => {
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+    return {
+      from: toIsoDate(monthStart),
+      to: toIsoDate(now),
+    }
+  })
+
+  const receivableRows = computed<FinancialRow[]>(() => {
+    return receivables.value.map(entry => ({
+      id: entry.id,
+      title: entry.documentNumber || entry.description,
+      party: entry.customerId
+        ? customerById.value.get(entry.customerId) || `Cliente ${entry.customerId.slice(0, 8)}`
+        : 'Cliente nao informado',
+      dueDate: formatDate(entry.dueDate),
+      amount: toNumber(entry.amount),
+      status: entry.status,
+    }))
+  })
+
+  const payableRows = computed<FinancialRow[]>(() => {
+    return payables.value.map(entry => ({
+      id: entry.id,
+      title: entry.documentNumber || entry.description,
+      party: entry.supplierId
+        ? supplierById.value.get(entry.supplierId) || `Fornecedor ${entry.supplierId.slice(0, 8)}`
+        : 'Fornecedor nao informado',
+      dueDate: formatDate(entry.dueDate),
+      amount: toNumber(entry.amount),
+      status: entry.status,
+    }))
+  })
+
+  const overdueRows = computed<OverdueAlertRow[]>(() => {
+    if (!overdueReport.value) {
+      return []
+    }
+
+    const overdueReceivables = overdueReport.value.receivables.map(entry => ({
+      id: `receivable-${entry.id}`,
+      title: `Receber: ${entry.documentNumber || entry.description}`,
+      reason: `Vencimento em ${formatDate(entry.dueDate)}`,
+      amount: toNumber(entry.amount),
+      dueDate: entry.dueDate,
+    }))
+
+    const overduePayables = overdueReport.value.payables.map(entry => ({
+      id: `payable-${entry.id}`,
+      title: `Pagar: ${entry.documentNumber || entry.description}`,
+      reason: `Vencimento em ${formatDate(entry.dueDate)}`,
+      amount: toNumber(entry.amount),
+      dueDate: entry.dueDate,
+    }))
+
+    const combinedRows = [...overdueReceivables, ...overduePayables]
+    const sortedRows = [...combinedRows]
+
+    sortedRows.sort((left, right) => {
+      return new Date(left.dueDate).getTime() - new Date(right.dueDate).getTime()
+    })
+
+    return sortedRows
+      .map(({ dueDate: _dueDate, ...row }) => row)
+      .slice(0, 8)
+  })
+
+  const cashFlowRows = computed<CashFlowRow[]>(() => {
+    return cashFlowEntries.value.slice(0, 10).map(entry => ({
+      id: entry.id,
+      label: entry.description || formatCashFlowLabel(entry),
+      date: formatDateTime(entry.date),
+      amount: toNumber(entry.amount),
+      type: entry.type,
+    }))
+  })
+
+  const receivableOpenValue = computed(() => {
+    if (dashboardReport.value) {
+      return toNumber(dashboardReport.value.receivable.open)
+    }
+
+    return receivables.value.reduce((total, entry) => {
+      return total + getReceivableOutstanding(entry)
+    }, 0)
+  })
+
+  const payableOpenValue = computed(() => {
+    if (dashboardReport.value) {
+      return toNumber(dashboardReport.value.payable.open)
+    }
+
+    return payables.value.reduce((total, entry) => {
+      return total + getPayableOutstanding(entry)
+    }, 0)
+  })
+
+  const dailyNetResult = computed(() => {
+    const today = toIsoDate(new Date())
+    const todayEntries = cashFlowEntries.value.filter(entry => {
+      return toIsoDate(new Date(entry.date)) === today
+    })
+
+    if (todayEntries.length > 0) {
+      const totals = todayEntries.reduce(
+        (acc, entry) => {
+          const amount = toNumber(entry.amount)
+          if (entry.type === 'IN') {
+            acc.totalIn += amount
+          } else {
+            acc.totalOut += amount
+          }
+          return acc
+        },
+        { totalIn: 0, totalOut: 0 },
+      )
+
+      return totals.totalIn - totals.totalOut
+    }
+
+    return toNumber(dashboardReport.value?.netBalance)
+  })
+
+  async function loadFinancialData () {
+    loading.value = true
+    errorMessage.value = null
+
+    let failures: string[] = []
+    let tasks: Promise<void>[] = []
+    const addFailure = (message: string) => {
+      failures = [...failures, message]
+    }
+    const addTask = (task: Promise<void>) => {
+      tasks = [...tasks, task]
+    }
+
+    if (canReadFinancialEntries.value) {
+      addTask(
+        financialApi
+          .listAccountsReceivable({
+            from: dateRange.value.from,
+            to: dateRange.value.to,
+            page: 1,
+            limit: 20,
+          })
+          .then(result => {
+            receivables.value = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar contas a receber.'))
+          }),
+      )
+
+      addTask(
+        financialApi
+          .listAccountsPayable({
+            from: dateRange.value.from,
+            to: dateRange.value.to,
+            page: 1,
+            limit: 20,
+          })
+          .then(result => {
+            payables.value = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar contas a pagar.'))
+          }),
+      )
+    } else {
+      receivables.value = []
+      payables.value = []
+    }
+
+    if (canReadDashboard.value) {
+      addTask(
+        financialApi
+          .getDashboardReport({
+            from: dateRange.value.from,
+            to: dateRange.value.to,
+          })
+          .then(result => {
+            dashboardReport.value = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar dashboard financeiro.'))
+          }),
+      )
+    } else {
+      dashboardReport.value = null
+    }
+
+    if (canReadReports.value) {
+      addTask(
+        financialApi
+          .getOverdueReport({
+            from: dateRange.value.from,
+            to: dateRange.value.to,
+            page: 1,
+            limit: 20,
+          })
+          .then(result => {
+            overdueReport.value = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar contas vencidas.'))
+          }),
+      )
+    } else {
+      overdueReport.value = null
+    }
+
+    if (canReadCashFlow.value) {
+      addTask(
+        financialApi
+          .listCashFlow({
+            from: dateRange.value.from,
+            to: dateRange.value.to,
+            page: 1,
+            limit: 20,
+          })
+          .then(result => {
+            cashFlowEntries.value = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar fluxo de caixa.'))
+          }),
+      )
+    } else {
+      cashFlowEntries.value = []
+    }
+
+    if (canReadMasterData.value) {
+      addTask(
+        financialApi
+          .listCustomers()
+          .then(result => {
+            customers.value = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar clientes.'))
+          }),
+      )
+
+      addTask(
+        financialApi
+          .listSuppliers()
+          .then(result => {
+            suppliers.value = result
+          })
+          .catch(error => {
+            addFailure(resolveApiError(error, 'Falha ao carregar fornecedores.'))
+          }),
+      )
+    } else {
+      customers.value = []
+      suppliers.value = []
+    }
+
+    await Promise.all(tasks)
+
+    if (failures.length > 0) {
+      errorMessage.value = failures[0] ?? 'Falha ao carregar dados financeiros.'
+    }
+
+    loading.value = false
+  }
+
+  function getReceivableOutstanding (entry: AccountsReceivableEntry): number {
+    const totalDue
+      = toNumber(entry.amount)
+        + toNumber(entry.interestAmount)
+        + toNumber(entry.fineAmount)
+        - toNumber(entry.discountAmount)
+        - toNumber(entry.receivedAmount)
+
+    return Math.max(totalDue, 0)
+  }
+
+  function getPayableOutstanding (entry: AccountsPayableEntry): number {
+    const totalDue
+      = toNumber(entry.amount)
+        + toNumber(entry.interestAmount)
+        + toNumber(entry.fineAmount)
+        - toNumber(entry.discountAmount)
+        - toNumber(entry.paidAmount)
+
+    return Math.max(totalDue, 0)
+  }
+
+  function formatCashFlowLabel (entry: CashFlowEntry): string {
+    if (entry.referenceType === 'RECEIVABLE') return 'Recebimento'
+    if (entry.referenceType === 'PAYABLE') return 'Pagamento'
+    return 'Transferencia'
+  }
+
+  function resolveApiError (error: unknown, fallback: string): string {
+    if (error instanceof ApiError) return error.message
+    if (error instanceof Error) return error.message
+    return fallback
+  }
+
+  function toIsoDate (date: Date): string {
+    return date.toISOString().slice(0, 10)
+  }
+
+  function toNumber (value: unknown): number {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+
+  function formatDate (value: string): string {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+
+    return date.toLocaleDateString('pt-BR')
+  }
+
+  function formatDateTime (value: string): string {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+
+    return date.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
 
   function formatCurrency (value: number): string {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-      maximumFractionDigits: 0,
-    }).format(value)
+      maximumFractionDigits: 2,
+    }).format(toNumber(value))
   }
+
+  onMounted(() => {
+    void loadFinancialData()
+  })
 </script>
