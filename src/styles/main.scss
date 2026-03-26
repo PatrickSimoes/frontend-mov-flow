@@ -2,6 +2,25 @@
   --app-display-font: 'Space Grotesk', 'Trebuchet MS', sans-serif;
   --app-text-font: 'Space Grotesk', 'Segoe UI', sans-serif;
   --app-code-font: 'JetBrains Mono', 'Courier New', monospace;
+
+  --mf-space-1: 0.25rem;
+  --mf-space-2: 0.5rem;
+  --mf-space-3: 0.75rem;
+  --mf-space-4: 1rem;
+  --mf-space-5: 1.25rem;
+  --mf-space-6: 1.5rem;
+  --mf-space-8: 2rem;
+  --mf-space-10: 2.5rem;
+
+  --mf-radius-sm: 0.5rem;
+  --mf-radius-md: 0.75rem;
+  --mf-radius-lg: 1rem;
+  --mf-radius-xl: 1.25rem;
+
+  --mf-shadow-sm: 0 2px 10px rgb(15 23 42 / 7%);
+  --mf-shadow-md: 0 8px 24px rgb(15 23 42 / 10%);
+
+  --mf-layout-max-width: 1540px;
 }
 
 html,
@@ -13,12 +32,13 @@ body,
 body {
   margin: 0;
   font-family: var(--app-text-font);
-  background: rgb(243 246 239);
-  color: rgb(28 37 39);
+  background: rgb(var(--v-theme-background));
+  color: rgb(var(--v-theme-text-primary));
 }
 
 .v-application {
   font-family: var(--app-text-font);
+  color: rgb(var(--v-theme-text-primary));
 }
 
 h1,
@@ -41,4 +61,35 @@ code,
 pre,
 .text-mono {
   font-family: var(--app-code-font) !important;
+}
+
+a {
+  color: rgb(var(--v-theme-primary));
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.app-page-container {
+  margin-inline: auto;
+  max-width: var(--mf-layout-max-width);
+  padding: clamp(0.75rem, 1.5vw, 1.5rem);
+  width: 100%;
+}
+
+.surface-card {
+  border: 1px solid rgb(var(--v-theme-border));
+  box-shadow: var(--mf-shadow-sm);
+}
+
+.surface-card--raised {
+  box-shadow: var(--mf-shadow-md);
+}
+
+.table-wrapper {
+  border: 1px solid rgb(var(--v-theme-border));
+  border-radius: var(--mf-radius-lg);
+  overflow: hidden;
 }
