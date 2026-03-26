@@ -7,12 +7,19 @@
     <template #actions>
       <v-btn
         color="primary"
-        prepend-icon="mdi-account-plus-outline"
+        :loading="loading"
+        prepend-icon="mdi-refresh"
         variant="flat"
-      >Novo usuario</v-btn>
+        @click="loadUsers"
+        >Atualizar lista</v-btn
+      >
       <v-btn prepend-icon="mdi-shield-account-outline" variant="outlined">Gerenciar perfis</v-btn>
     </template>
   </PageHeader>
+
+  <v-alert v-if="errorMessage" class="mb-4" type="error" variant="tonal">
+    {{ errorMessage }}
+  </v-alert>
 
   <v-row class="mb-2">
     <v-col cols="12" lg="3" sm="6">
@@ -20,34 +27,34 @@
         description="Equipe com acesso ativo"
         icon="mdi-account-group-outline"
         label="Usuarios ativos"
-        value="18"
+        :value="String(activeUsersCount)"
       />
     </v-col>
     <v-col cols="12" lg="3" sm="6">
       <MetricCard
-        description="Perfis personalizados e padrao"
+        description="Usuarios sem acesso ativo"
+        icon="mdi-account-off-outline"
+        icon-color="warning"
+        label="Usuarios inativos"
+        :value="String(inactiveUsersCount)"
+      />
+    </v-col>
+    <v-col cols="12" lg="3" sm="6">
+      <MetricCard
+        description="Perfis atribuidos na empresa"
         icon="mdi-shield-key-outline"
         icon-color="secondary"
         label="Perfis de acesso"
-        value="6"
+        :value="String(profileDistribution.length)"
       />
     </v-col>
     <v-col cols="12" lg="3" sm="6">
       <MetricCard
-        description="Pendentes de confirmacao"
-        icon="mdi-account-clock-outline"
-        icon-color="warning"
-        label="Convites pendentes"
-        value="3"
-      />
-    </v-col>
-    <v-col cols="12" lg="3" sm="6">
-      <MetricCard
-        description="Ultimas 24 horas"
+        description="Registros carregados nesta visualizacao"
         icon="mdi-history"
         icon-color="info"
-        label="Eventos registrados"
-        value="42"
+        label="Usuarios listados"
+        :value="String(users.length)"
       />
     </v-col>
   </v-row>
@@ -55,26 +62,36 @@
   <v-row>
     <v-col cols="12" xl="8">
       <v-card class="surface-card mb-4" variant="flat">
-        <v-card-item subtitle="Perfis e status da equipe" title="Equipe" />
+        <v-card-item subtitle="Dados reais do tenant atual" title="Equipe" />
 
         <v-table class="table-wrapper" density="comfortable">
           <thead>
             <tr>
               <th>Nome</th>
-              <th>Perfil</th>
-              <th>Area</th>
-              <th>Ultimo acesso</th>
+              <th>E-mail</th>
+              <th>Perfis</th>
+              <th>Criado em</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="user in users" :key="user.id">
+            <tr v-if="loading">
+              <td class="text-center text-medium-emphasis py-6" colspan="5">
+                Carregando usuarios...
+              </td>
+            </tr>
+            <tr v-else-if="users.length === 0">
+              <td class="text-center text-medium-emphasis py-6" colspan="5">
+                Nenhum usuario encontrado para esta empresa.
+              </td>
+            </tr>
+            <tr v-for="user in users" v-else :key="user.id">
               <td class="font-weight-medium">{{ user.name }}</td>
-              <td>{{ user.role }}</td>
-              <td>{{ user.area }}</td>
-              <td>{{ user.lastAccess }}</td>
+              <td>{{ user.email }}</td>
+              <td>{{ formatRoleList(user) }}</td>
+              <td>{{ formatDateTime(user.createdAt) }}</td>
               <td>
-                <StatusChip :status="user.status" />
+                <StatusChip :status="user.isActive ? 'active' : 'blocked'" />
               </td>
             </tr>
           </tbody>
@@ -82,25 +99,30 @@
       </v-card>
 
       <v-card class="surface-card" variant="flat">
-        <v-card-item subtitle="Ultimos registros relevantes" title="Auditoria" />
+        <v-card-item subtitle="Ultimos registros da base" title="Atividade recente" />
 
         <v-list class="bg-transparent" density="comfortable" lines="two">
           <v-list-item
-            v-for="event in auditEvents"
-            :key="event.id"
-            :subtitle="event.description"
-            :title="event.title"
+            v-for="item in recentActivity"
+            :key="item.id"
+            :subtitle="item.subtitle"
+            :title="item.title"
           >
             <template #prepend>
               <v-avatar color="surface-variant" rounded="lg" size="30" variant="flat">
-                <v-icon :icon="event.icon" size="18" />
+                <v-icon icon="mdi-account-clock-outline" size="18" />
               </v-avatar>
             </template>
 
             <template #append>
-              <div class="text-caption text-medium-emphasis">{{ event.when }}</div>
+              <div class="text-caption text-medium-emphasis">{{ item.when }}</div>
             </template>
           </v-list-item>
+
+          <v-list-item
+            v-if="!loading && recentActivity.length === 0"
+            title="Sem registros recentes para exibir"
+          />
         </v-list>
       </v-card>
     </v-col>
@@ -110,18 +132,21 @@
         <v-card-item subtitle="Distribuicao por perfil" title="Perfis de acesso" />
 
         <v-list class="bg-transparent" density="comfortable">
-          <v-list-item v-for="profile in profiles" :key="profile.name">
+          <v-list-item v-for="profile in profileDistribution" :key="profile.name">
             <v-list-item-title class="font-weight-medium">{{ profile.name }}</v-list-item-title>
             <v-list-item-subtitle>{{ profile.description }}</v-list-item-subtitle>
 
             <template #append>
-              <v-chip
-                color="primary"
-                size="small"
-                variant="tonal"
-              >{{ profile.users }} usuarios</v-chip>
+              <v-chip color="primary" size="small" variant="tonal"
+                >{{ profile.users }} usuarios</v-chip
+              >
             </template>
           </v-list-item>
+
+          <v-list-item
+            v-if="!loading && profileDistribution.length === 0"
+            title="Sem perfis atribuidos"
+          />
         </v-list>
       </v-card>
 
@@ -131,15 +156,15 @@
           <v-list class="bg-transparent" density="compact">
             <v-list-item
               prepend-icon="mdi-check-circle-outline"
-              title="Revisar perfis de acesso mensalmente"
+              title="Revise perfis de acesso mensalmente"
             />
             <v-list-item
               prepend-icon="mdi-check-circle-outline"
-              title="Desativar usuarios sem atividade"
+              title="Desative usuarios sem atividade"
             />
             <v-list-item
               prepend-icon="mdi-check-circle-outline"
-              title="Registrar mudancas de permissao"
+              title="Registre mudancas de permissao"
             />
           </v-list>
         </v-card-text>
@@ -149,84 +174,111 @@
 </template>
 
 <script setup lang="ts">
-  import MetricCard from '@/components/ui/MetricCard.vue'
-  import PageHeader from '@/components/ui/PageHeader.vue'
-  import StatusChip from '@/components/ui/StatusChip.vue'
+import type { TenantUser } from '@/types/users'
+import { computed, onMounted, ref } from 'vue'
+import MetricCard from '@/components/ui/MetricCard.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import StatusChip from '@/components/ui/StatusChip.vue'
+import { usersApi } from '@/services/api'
+import { ApiError } from '@/services/http'
 
-  const users = [
-    {
-      id: 'user-1',
-      name: 'Ana Martins',
-      role: 'Administradora',
-      area: 'Financeiro',
-      lastAccess: 'Hoje, 09:22',
-      status: 'active',
-    },
-    {
-      id: 'user-2',
-      name: 'Carlos Ferreira',
-      role: 'Supervisor Operacional',
-      area: 'Operacao',
-      lastAccess: 'Hoje, 08:47',
-      status: 'active',
-    },
-    {
-      id: 'user-3',
-      name: 'Marina Souza',
-      role: 'Analista de Frota',
-      area: 'Frota',
-      lastAccess: 'Ontem, 18:16',
-      status: 'pending',
-    },
-    {
-      id: 'user-4',
-      name: 'Pedro Lima',
-      role: 'Financeiro',
-      area: 'Financeiro',
-      lastAccess: 'Ontem, 16:01',
-      status: 'blocked',
-    },
-  ]
+const users = ref<TenantUser[]>([])
+const loading = ref(false)
+const errorMessage = ref<string | null>(null)
 
-  const profiles = [
-    {
-      name: 'Administradora',
-      description: 'Acesso completo a operacao e configuracoes',
-      users: 2,
-    },
-    {
-      name: 'Supervisor Operacional',
-      description: 'Gestao de pedidos, entregas e frota',
-      users: 5,
-    },
-    {
-      name: 'Financeiro',
-      description: 'Controle de contas, conciliacao e relatorios',
-      users: 4,
-    },
-  ]
+const activeUsersCount = computed(() => users.value.filter((user) => user.isActive).length)
+const inactiveUsersCount = computed(() => users.value.filter((user) => !user.isActive).length)
 
-  const auditEvents = [
-    {
-      id: 'audit-1',
-      title: 'Perfil atualizado para Marina Souza',
-      description: 'Permissoes de operacao e frota foram ajustadas.',
-      when: 'Ha 1h',
-      icon: 'mdi-shield-edit-outline',
-    },
-    {
-      id: 'audit-2',
-      title: 'Novo usuario convidado',
-      description: 'Convite enviado para joao@empresa.com.',
-      when: 'Ha 3h',
-      icon: 'mdi-account-plus-outline',
-    },
-    {
-      id: 'audit-3',
-      title: 'Permissao removida de perfil temporario',
-      description: 'Ajuste preventivo realizado pela administracao.',
-      when: 'Ontem',
-      icon: 'mdi-lock-outline',
-    },
-  ]
+const profileDistribution = computed(() => {
+  const profileCounter = new Map<string, number>()
+
+  for (const user of users.value) {
+    const profiles = (user.userRoles ?? [])
+      .map((assignment) => assignment.role?.name)
+      .filter(Boolean) as string[]
+    const normalizedProfiles = profiles.length > 0 ? profiles : ['Sem perfil']
+
+    for (const profile of normalizedProfiles) {
+      profileCounter.set(profile, (profileCounter.get(profile) ?? 0) + 1)
+    }
+  }
+
+  const profiles = [...profileCounter.entries()].map(([name, count]) => ({
+    name,
+    users: count,
+    description: profileDescription(name),
+  }))
+
+  profiles.sort((left: { users: number }, right: { users: number }) => right.users - left.users)
+  return profiles
+})
+
+const recentActivity = computed(() => {
+  const sortedUsers = [...users.value]
+
+  sortedUsers.sort((left: TenantUser, right: TenantUser) => {
+    return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+  })
+  return sortedUsers.slice(0, 6).map((user: TenantUser) => ({
+    id: user.id,
+    title: `${user.name} (${formatRoleList(user)})`,
+    subtitle: user.isActive ? 'Usuario ativo no sistema' : 'Usuario inativo',
+    when: formatDateTime(user.updatedAt),
+  }))
+})
+
+async function loadUsers() {
+  loading.value = true
+  errorMessage.value = null
+
+  try {
+    users.value = await usersApi.list({ page: 1, limit: 100 })
+  } catch (error) {
+    errorMessage.value =
+      error instanceof ApiError
+        ? error.message
+        : 'Nao foi possivel carregar os usuarios da empresa.'
+  } finally {
+    loading.value = false
+  }
+}
+
+function formatRoleList(user: TenantUser): string {
+  const roleNames = user.userRoles?.map((assignment) => assignment.role?.name).filter(Boolean) ?? []
+
+  if (roleNames.length === 0) {
+    return 'Sem perfil'
+  }
+
+  return roleNames.join(', ')
+}
+
+function profileDescription(profileName: string): string {
+  if (profileName.toLowerCase() === 'owner') {
+    return 'Perfil administrativo com acesso amplo.'
+  }
+
+  if (profileName === 'Sem perfil') {
+    return 'Usuarios sem atribuicao de perfil no momento.'
+  }
+
+  return 'Perfil configurado para operacao da empresa.'
+}
+
+function formatDateTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+onMounted(() => {
+  void loadUsers()
+})
 </script>
