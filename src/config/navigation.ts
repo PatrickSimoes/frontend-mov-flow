@@ -17,31 +17,72 @@ export interface NavSection {
 }
 
 export const MODULE_LABELS: Record<ModuleCode, string> = {
-  logistics: 'Logística',
+  logistics: 'Operacao',
   fleet: 'Frota',
   financial: 'Financeiro',
 }
 
 export const NAVIGATION: NavSection[] = [
   {
-    title: 'Visão Geral',
+    title: 'Visao Geral',
     items: [
       {
-        title: 'Dashboard',
-        subtitle: 'Status da sessão, tenant e módulos ativos',
+        title: 'Painel',
+        subtitle: 'Resumo da operacao, alertas e indicadores',
         to: '/app/dashboard',
         icon: 'mdi-view-dashboard-outline',
       },
     ],
   },
   {
-    title: 'Gestão',
+    title: 'Operacao',
     items: [
       {
-        title: 'Administrativo',
-        subtitle: 'Tenant, usuários, roles, permissões e auditoria',
+        title: 'Operacao',
+        subtitle: 'Pedidos, entregas, frota e programacao',
+        to: '/app/operations',
+        icon: 'mdi-truck-fast-outline',
+        permissionsAny: ['drivers.read', 'vehicles.read', 'orders.read', 'shipments.read'],
+        modulesAny: ['fleet', 'logistics'],
+      },
+    ],
+  },
+  {
+    title: 'Financeiro',
+    items: [
+      {
+        title: 'Financeiro',
+        subtitle: 'Contas, bancos, conciliacao e fluxo de caixa',
+        to: '/app/financial',
+        icon: 'mdi-cash-multiple',
+        permissionsAny: ['financial.read', 'financial.master.read', 'financial.reports.read'],
+        modulesAll: ['financial'],
+      },
+      {
+        title: 'Relatorios',
+        subtitle: 'Desempenho operacional e financeiro',
+        to: '/app/reports',
+        icon: 'mdi-chart-line',
+        permissionsAny: ['financial.reports.read', 'financial.dashboard.read'],
+        modulesAll: ['financial'],
+      },
+      {
+        title: 'Assinatura',
+        subtitle: 'Plano atual, pagamentos e consumo',
+        to: '/app/billing',
+        icon: 'mdi-credit-card-outline',
+        permissionsAny: ['saas.plans.read', 'saas.subscriptions.read', 'saas.payments.read'],
+      },
+    ],
+  },
+  {
+    title: 'Gestao',
+    items: [
+      {
+        title: 'Usuarios e Acessos',
+        subtitle: 'Equipe, perfis, permissoes e auditoria',
         to: '/app/admin',
-        icon: 'mdi-shield-account-outline',
+        icon: 'mdi-account-group-outline',
         permissionsAny: [
           'companies.read',
           'users.read',
@@ -52,39 +93,11 @@ export const NAVIGATION: NavSection[] = [
         ],
       },
       {
-        title: 'Configurações',
-        subtitle: 'Moeda, juros, multa e regras padrão do tenant',
+        title: 'Configuracoes',
+        subtitle: 'Preferencias gerais da empresa',
         to: '/app/settings',
         icon: 'mdi-cog-outline',
         permissionsAll: ['settings.read'],
-      },
-    ],
-  },
-  {
-    title: 'Execução',
-    items: [
-      {
-        title: 'Operações',
-        subtitle: 'Frota, logística, expedição e documentos fiscais',
-        to: '/app/operations',
-        icon: 'mdi-truck-fast-outline',
-        permissionsAny: ['drivers.read', 'vehicles.read', 'orders.read', 'shipments.read'],
-        modulesAny: ['fleet', 'logistics'],
-      },
-      {
-        title: 'Financeiro',
-        subtitle: 'AP/AR, bancos, reconciliação e relatórios',
-        to: '/app/financial',
-        icon: 'mdi-cash-multiple',
-        permissionsAny: ['financial.read', 'financial.master.read', 'financial.reports.read'],
-        modulesAll: ['financial'],
-      },
-      {
-        title: 'Billing SaaS',
-        subtitle: 'Planos, assinatura, pagamentos e consumo',
-        to: '/app/billing',
-        icon: 'mdi-credit-card-outline',
-        permissionsAny: ['saas.plans.read', 'saas.subscriptions.read', 'saas.payments.read'],
       },
     ],
   },

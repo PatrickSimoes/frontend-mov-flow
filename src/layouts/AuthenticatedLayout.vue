@@ -1,27 +1,46 @@
 <template>
-  <div class="app-shell">
+  <v-layout class="app-shell">
     <v-navigation-drawer
       v-model="drawer"
-      border="0"
+      class="shell-drawer"
       color="surface"
       :temporary="display.mdAndDown.value"
-      width="320"
+      width="296"
     >
-      <div class="pa-6 pb-2">
-        <div class="text-overline text-secondary">Mov Flow</div>
-        <h1 class="text-h5 font-weight-bold">Portal SaaS</h1>
-        <div class="text-body-2 text-medium-emphasis">Logística, operação e financeiro multi-tenant</div>
+      <div class="drawer-brand px-5 pt-6 pb-4">
+        <div class="d-flex align-center ga-3 mb-3">
+          <v-avatar
+            class="brand-avatar"
+            color="primary"
+            rounded="lg"
+            size="36"
+            variant="flat"
+          >
+            <v-icon icon="mdi-truck-fast-outline" size="20" />
+          </v-avatar>
+          <div>
+            <div class="text-subtitle-1 font-weight-bold">MOV FLOW</div>
+            <div class="text-caption text-medium-emphasis">Gestao operacional</div>
+          </div>
+        </div>
+
+        <v-chip class="text-caption" color="secondary" size="small" variant="tonal">
+          {{ companyLabel }}
+        </v-chip>
       </div>
 
-      <v-divider class="mb-2" />
+      <v-divider />
 
-      <v-list class="px-2" density="comfortable" nav>
+      <v-list class="px-2 py-3" density="comfortable" nav>
         <template v-for="section in visibleNavigation" :key="section.title">
-          <v-list-subheader class="text-uppercase text-caption">{{ section.title }}</v-list-subheader>
+          <v-list-subheader class="text-uppercase text-caption section-label">{{
+            section.title
+          }}</v-list-subheader>
 
           <v-list-item
             v-for="item in section.items"
             :key="item.to"
+            class="mb-1"
             :prepend-icon="item.icon"
             rounded="lg"
             :subtitle="item.subtitle"
@@ -33,9 +52,11 @@
 
       <template #append>
         <v-divider class="mb-3" />
+
         <div class="px-4 pb-5">
-          <div class="text-caption text-medium-emphasis mb-2">Módulos habilitados</div>
-          <div class="d-flex flex-wrap ga-2">
+          <div class="text-caption text-medium-emphasis mb-2">Recursos do plano</div>
+
+          <div class="d-flex flex-wrap ga-2 mb-4">
             <v-chip
               v-for="moduleCode in session.state.enabledModules"
               :key="moduleCode"
@@ -45,21 +66,32 @@
             >
               {{ MODULE_LABELS[moduleCode] }}
             </v-chip>
+
             <v-chip
               v-if="session.state.enabledModules.length === 0"
               color="warning"
               size="small"
-              variant="outlined"
+              variant="tonal"
             >
-              Nenhum módulo ativo
+              Sem recursos ativos
             </v-chip>
           </div>
+
+          <v-btn
+            block
+            color="error"
+            prepend-icon="mdi-logout"
+            variant="tonal"
+            @click="handleLogout"
+          >
+            Sair
+          </v-btn>
         </div>
       </template>
     </v-navigation-drawer>
 
-    <v-main>
-      <v-app-bar class="px-2" color="transparent" flat>
+    <v-main class="shell-main">
+      <v-app-bar class="shell-topbar px-2 px-sm-4" color="surface" flat height="72">
         <v-btn
           v-if="display.mdAndDown.value"
           icon="mdi-menu"
@@ -67,41 +99,54 @@
           @click="drawer = !drawer"
         />
 
-        <v-app-bar-title class="text-h6 font-weight-bold">{{ pageTitle }}</v-app-bar-title>
+        <div class="d-none d-md-flex align-center">
+          <v-breadcrumbs density="compact" :items="breadcrumbs">
+            <template #divider>
+              <v-icon icon="mdi-chevron-right" size="16" />
+            </template>
+          </v-breadcrumbs>
+        </div>
+
+        <v-app-bar-title class="d-md-none text-subtitle-1 font-weight-bold">
+          {{ pageTitle }}
+        </v-app-bar-title>
+
+        <v-spacer />
+
+        <ThemeModeMenu />
 
         <v-chip
           v-if="session.state.tenant"
-          class="mr-3"
+          class="ml-1"
           color="secondary"
           size="small"
-          variant="flat"
+          variant="tonal"
         >
-          {{ session.state.tenant.slug }}
+          Codigo: {{ companyCode }}
         </v-chip>
 
         <v-menu location="bottom end">
           <template #activator="{ props }">
-            <v-btn v-bind="props" icon="mdi-account-circle-outline" variant="text" />
+            <v-btn v-bind="props" class="ml-1" icon="mdi-account-circle-outline" variant="text" />
           </template>
 
-          <v-card min-width="280" rounded="xl">
+          <v-card min-width="280">
             <v-card-text>
-              <div class="text-subtitle-1 font-weight-bold">
-                {{ session.state.session?.user.name || 'Usuário' }}
-              </div>
-              <div class="text-body-2 text-medium-emphasis">
-                {{ session.state.session?.user.email || '-' }}
-              </div>
-              <div class="text-caption mt-2">
-                Roles: {{ session.state.session?.user.roles.join(', ') || 'sem role' }}
-              </div>
+              <div class="text-subtitle-1 font-weight-bold">{{ userName }}</div>
+              <div class="text-body-2 text-medium-emphasis mb-2">{{ userEmail }}</div>
+              <div class="text-caption">Perfil: {{ userRoles }}</div>
             </v-card-text>
 
             <v-divider />
 
             <v-card-actions>
-              <v-btn color="primary" prepend-icon="mdi-cog-outline" to="/app/settings" variant="text">
-                Configurações
+              <v-btn
+                color="primary"
+                prepend-icon="mdi-cog-outline"
+                to="/app/settings"
+                variant="text"
+              >
+                Configuracoes
               </v-btn>
               <v-spacer />
               <v-btn color="error" prepend-icon="mdi-logout" variant="text" @click="handleLogout">
@@ -112,21 +157,22 @@
         </v-menu>
       </v-app-bar>
 
-      <v-container class="pb-8" fluid>
+      <v-container class="app-page-container pt-6 pb-10" fluid>
         <router-view />
       </v-container>
     </v-main>
+  </v-layout>
 
-    <v-snackbar v-model="showSessionWarning" color="warning" timeout="5000">
-      {{ session.state.bootstrapError }}
-    </v-snackbar>
-  </div>
+  <v-snackbar v-model="showSessionWarning" color="warning" timeout="5000">
+    {{ session.state.bootstrapError }}
+  </v-snackbar>
 </template>
 
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import { useDisplay } from 'vuetify'
+  import ThemeModeMenu from '@/components/ui/ThemeModeMenu.vue'
   import { MODULE_LABELS, NAVIGATION, type NavItem } from '@/config/navigation'
   import { useSessionStore } from '@/stores/session'
 
@@ -154,6 +200,36 @@
 
   const pageTitle = computed(() => {
     return (route.meta.title as string | undefined) || 'Mov Flow'
+  })
+
+  const breadcrumbs = computed(() => {
+    const titledRecords = route.matched.filter(record => typeof record.meta?.title === 'string')
+
+    return titledRecords.map((record, index) => ({
+      title: record.meta.title as string,
+      disabled: index === titledRecords.length - 1,
+      to: index === titledRecords.length - 1 ? undefined : record.path,
+    }))
+  })
+
+  const companyLabel = computed(() => {
+    return session.state.tenant?.name || 'Empresa nao identificada'
+  })
+
+  const companyCode = computed(() => {
+    return session.state.tenant?.slug || '--'
+  })
+
+  const userName = computed(() => {
+    return session.state.session?.user.name || 'Usuario'
+  })
+
+  const userEmail = computed(() => {
+    return session.state.session?.user.email || '-'
+  })
+
+  const userRoles = computed(() => {
+    return session.state.session?.user.roles.join(', ') || 'Sem perfil'
   })
 
   function canAccessItem (item: NavItem): boolean {
@@ -191,10 +267,31 @@
 
 <style scoped>
 .app-shell {
-  background:
-    radial-gradient(1200px 500px at 90% -10%, rgb(44 146 134 / 16%), transparent 60%),
-    radial-gradient(900px 400px at -10% 110%, rgb(214 142 38 / 14%), transparent 60%),
-    linear-gradient(180deg, rgb(248 250 246) 0%, rgb(242 245 240) 100%);
+  background: rgb(var(--v-theme-background));
   min-height: 100vh;
+}
+
+.shell-drawer {
+  border-right: 1px solid rgb(var(--v-theme-divider));
+}
+
+.drawer-brand {
+  background: rgb(var(--v-theme-surface-variant));
+}
+
+.brand-avatar {
+  border: 1px solid rgb(var(--v-theme-border));
+}
+
+.section-label {
+  letter-spacing: 0.06em;
+}
+
+.shell-main {
+  min-height: 100vh;
+}
+
+.shell-topbar {
+  border-bottom: 1px solid rgb(var(--v-theme-divider));
 }
 </style>

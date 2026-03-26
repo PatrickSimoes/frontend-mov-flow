@@ -1,5 +1,10 @@
 import type { ModuleCode } from '@/types/auth'
-import { createRouter, createWebHistory, type RouteLocationNormalized, type RouteRecordRaw } from 'vue-router'
+import {
+  createRouter,
+  createWebHistory,
+  type RouteLocationNormalized,
+  type RouteRecordRaw,
+} from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 
 declare module 'vue-router' {
@@ -33,7 +38,7 @@ const routes: RouteRecordRaw[] = [
     name: 'register',
     component: () => import('@/pages/public/RegisterPage.vue'),
     meta: {
-      title: 'Criar Tenant',
+      title: 'Criar empresa',
       guestOnly: true,
     },
   },
@@ -42,7 +47,7 @@ const routes: RouteRecordRaw[] = [
     name: 'forbidden',
     component: () => import('@/pages/public/ForbiddenPage.vue'),
     meta: {
-      title: 'Acesso Negado',
+      title: 'Acesso restrito',
       requiresAuth: true,
     },
   },
@@ -62,7 +67,7 @@ const routes: RouteRecordRaw[] = [
         name: 'dashboard',
         component: () => import('@/pages/app/DashboardPage.vue'),
         meta: {
-          title: 'Dashboard',
+          title: 'Painel',
         },
       },
       {
@@ -70,7 +75,7 @@ const routes: RouteRecordRaw[] = [
         name: 'admin',
         component: () => import('@/pages/app/AdminPage.vue'),
         meta: {
-          title: 'Administrativo',
+          title: 'Usuarios e Acessos',
           permissionsAny: [
             'companies.read',
             'users.read',
@@ -87,7 +92,7 @@ const routes: RouteRecordRaw[] = [
         name: 'operations',
         component: () => import('@/pages/app/OperationsPage.vue'),
         meta: {
-          title: 'Operações',
+          title: 'Operacao',
           modulesAny: ['fleet', 'logistics'],
           permissionsAny: ['drivers.read', 'vehicles.read', 'orders.read', 'shipments.read'],
         },
@@ -103,11 +108,21 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'reports',
+        name: 'reports',
+        component: () => import('@/pages/app/ReportsPage.vue'),
+        meta: {
+          title: 'Relatorios',
+          modulesAll: ['financial'],
+          permissionsAny: ['financial.reports.read', 'financial.dashboard.read'],
+        },
+      },
+      {
         path: 'billing',
         name: 'billing',
         component: () => import('@/pages/app/BillingPage.vue'),
         meta: {
-          title: 'Billing SaaS',
+          title: 'Assinatura',
           permissionsAny: ['saas.plans.read', 'saas.subscriptions.read', 'saas.payments.read'],
         },
       },
@@ -116,7 +131,7 @@ const routes: RouteRecordRaw[] = [
         name: 'settings',
         component: () => import('@/pages/app/SettingsPage.vue'),
         meta: {
-          title: 'Configurações do Tenant',
+          title: 'Configuracoes da Empresa',
           permissionsAll: ['settings.read'],
         },
       },
@@ -127,7 +142,7 @@ const routes: RouteRecordRaw[] = [
     name: 'not-found',
     component: () => import('@/pages/public/NotFoundPage.vue'),
     meta: {
-      title: 'Página não encontrada',
+      title: 'Pagina nao encontrada',
     },
   },
 ]
@@ -149,7 +164,10 @@ function missingPermission (
     return missingRequired
   }
 
-  if (permissionsAny.length > 0 && !permissionsAny.some(permission => hasPermission(permission))) {
+  if (
+    permissionsAny.length > 0
+    && !permissionsAny.some(permission => hasPermission(permission))
+  ) {
     return permissionsAny[0] ?? null
   }
 
