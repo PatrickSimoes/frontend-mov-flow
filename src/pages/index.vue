@@ -5,7 +5,11 @@
       <p class="text-body-2 text-medium-emphasis mb-4">
         A rota raiz foi substituída por roteamento explícito em <code>/app/dashboard</code>.
       </p>
-      <v-btn color="primary" prepend-icon="mdi-arrow-right" to="/app/dashboard">Abrir dashboard</v-btn>
+      <v-btn
+        color="primary"
+        prepend-icon="mdi-arrow-right"
+        to="/app/dashboard"
+      >Abrir dashboard</v-btn>
     </v-card>
   </v-container>
 </template>

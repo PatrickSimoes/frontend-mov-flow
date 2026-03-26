@@ -1,9 +1,4 @@
-import type {
-  AuthSessionResponse,
-  LoginPayload,
-  MeResponse,
-  RegisterPayload,
-} from '@/types/auth'
+import type { AuthSessionResponse, LoginPayload, MeResponse, RegisterPayload } from '@/types/auth'
 import { apiRequest } from '@/services/http'
 
 export const authApi = {

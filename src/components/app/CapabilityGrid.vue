@@ -38,7 +38,11 @@
           <div v-if="item.workflows && item.workflows.length > 0">
             <div class="text-caption text-medium-emphasis mb-2">Workflows especiais</div>
             <v-list class="pa-0 bg-transparent" density="compact">
-              <v-list-item v-for="workflow in item.workflows" :key="workflow" prepend-icon="mdi-check-circle-outline">
+              <v-list-item
+                v-for="workflow in item.workflows"
+                :key="workflow"
+                prepend-icon="mdi-check-circle-outline"
+              >
                 <v-list-item-title class="text-body-2">{{ workflow }}</v-list-item-title>
               </v-list-item>
             </v-list>

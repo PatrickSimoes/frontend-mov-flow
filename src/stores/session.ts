@@ -1,4 +1,10 @@
-import type { AuthSession, AuthSessionResponse, LoginPayload, ModuleCode, RegisterPayload } from '@/types/auth'
+import type {
+  AuthSession,
+  AuthSessionResponse,
+  LoginPayload,
+  ModuleCode,
+  RegisterPayload,
+} from '@/types/auth'
 import type { TenantProfile } from '@/types/tenant'
 import { computed, reactive } from 'vue'
 import { authApi, saasApi, tenantApi } from '@/services/api'
@@ -35,8 +41,9 @@ let initializePromise: Promise<void> | null = null
 
 function normalizeModules (modules: string[]): ModuleCode[] {
   const validModules = new Set<ModuleCode>(['logistics', 'fleet', 'financial'])
-  const unique = [...new Set(modules)]
-    .filter((moduleCode): moduleCode is ModuleCode => validModules.has(moduleCode as ModuleCode))
+  const unique = [...new Set(modules)].filter((moduleCode): moduleCode is ModuleCode =>
+    validModules.has(moduleCode as ModuleCode),
+  )
 
   return unique
 }
@@ -127,7 +134,7 @@ async function refreshSessionContext () {
     state.session.user = meResult.value
   }
 
-  state.tenant = tenantResult.status === 'fulfilled' ? tenantResult.value : state.tenant ?? null
+  state.tenant = tenantResult.status === 'fulfilled' ? tenantResult.value : (state.tenant ?? null)
 
   if (modulesResult.status === 'fulfilled') {
     state.enabledModules = normalizeModules(modulesResult.value)
